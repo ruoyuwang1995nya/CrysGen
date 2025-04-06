@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "crysgen"
+version = "0.0.0"
+description = "A Python project for crystal generation."
+authors = [{name = "Ruoyu Wang", email = "ruoyuwang1995@gmail.com"}]
+license = "MIT"
+readme = "README.md"
+requires-python = ">=3.10"
