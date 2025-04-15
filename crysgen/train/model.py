@@ -14,7 +14,8 @@ class BaseModel(ABC):
         self._data_train = None
         self._data_val = None
         self._data_test = None
-        
+        self._stru_gen = None
+        self._stru_gen_traj = None
     
     @property
     def model(self):
@@ -31,6 +32,13 @@ class BaseModel(ABC):
     @property
     def data_test(self):
         return self._data_test
+    
+    @property
+    def stru_gen(self):
+        return self._stru_gen
+    @property
+    def stru_gen_traj(self):
+        return self._stru_gen_traj
     
     @staticmethod
     def register(key:str):
@@ -78,3 +86,5 @@ class BaseModel(ABC):
         Generate new samples.
         """
         pass
+    
+    

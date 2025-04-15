@@ -1,5 +1,5 @@
 from crysgen.train.model import BaseModel
-from crysgen.train.utils import dict_to_mattergen_args
+from crysgen.train.utils import dict_to_hydra_args
 from typing import Optional, Union, Dict, List
 from pathlib import Path
 import subprocess
@@ -93,7 +93,7 @@ class MatterGen(BaseModel):
                     subprocess.run(custom_cmd.split(), check=True)
                 else:
                     # parse arguments and run the command
-                    arguments=self.dict_to_mattergen_args(config)
+                    arguments=self.dict_to_hydra_args(config)
                     additional_args=additional_args
                     # parse additional commands
                     cmd= ['mattergen-finetune', f'adapter.model_path={str(self.model)}'] + args_data+ arguments + additional_args
@@ -118,11 +118,14 @@ class MatterGen(BaseModel):
                     subprocess.run(custom_cmd.split(), check=True)
                 else:
                     # parse arguments and run the command
-                    arguments=self.dict_to_mattergen_args(config)
+                    arguments=self.dict_to_hydra_args(config)
                     additional_args=additional_args
                     # parse additional commands
                     cmd=['mattergen-train'] + arguments + additional_args
-                    subprocess.run(cmd, check=True)
+                    if venv:
+                        cmd.insert(0, f"source {venv}/bin/activate && ")
+                    cmd_str = ' '.join(cmd)
+                    subprocess.run(cmd_str, check=True,shell=True,env=env, executable='/bin/bash')
                 
             except subprocess.CalledProcessError as e:
                 print(f"Error during training: {e}")
@@ -144,15 +147,57 @@ class MatterGen(BaseModel):
         else:
             print("No valid checkpoint directories found.")
         
-    
-    def generate(self, *args, **kwargs):
+    def generate(self, 
+                config: Optional[Dict] = {},
+                additional_args: Optional[List] = [],
+                custom_cmd: Optional[str] = None,
+                env: Optional[Dict] = {},
+                venv: Optional[str] = None,
+                results_dir: Optional[Union[Path, str]] = None,
+                 ):
         """
         Generate new samples using the MatterGen model.
         """
-        pass
-    
+        if not self.model:
+            raise ValueError("Model path is required for generation.")
+        
+        if results_dir is None:
+            results_dir = Path("outputs")
+            results_dir.mkdir(parents=True, exist_ok=True)
+        else:
+            results_dir = Path(results_dir)
+            results_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            if custom_cmd:
+                subprocess.run(custom_cmd, check=True)
+            else:
+                arguments=self.dict_to_fire_args(config)
+                additional_args=additional_args
+                cmd=['mattergen-generate', f'{str(results_dir)}',f'--model_path={str(self.model)}'] + arguments + additional_args
+                if venv:
+                    cmd.insert(0, f"source {venv}/bin/activate && ")
+                cmd_str = ' '.join(cmd)
+                subprocess.run(cmd_str, check=True,shell=True,env=env, executable='/bin/bash')
+        except subprocess.CalledProcessError as e:
+            print(f"Error during generation: {e}")
+        
+        # check output files
+        # if results_dir/generated_crystals.extxyz exists, set self.stru_gen to the path
+        generated_crystals = results_dir / "generated_crystals.extxyz"
+        if generated_crystals.exists():
+            self._stru_gen = str(generated_crystals)
+            print(f"Generated crystals saved to: {self.stru_gen}")
+        else:
+            print("No generated crystals found.")
+            
+        generated_crystals_traj = results_dir / "generated_crystals.traj"
+        if generated_crystals_traj.exists():
+            self._stru_gen_traj = str(generated_crystals_traj)
+            print(f"Trajectory of crystal generation saved to: {self.stru_gen_traj}")
+        
+        
     @staticmethod
-    def dict_to_mattergen_args(config: Dict) -> list:
+    def dict_to_hydra_args(config: Dict) -> list:
         """
         Convert a nested dictionary into a list of CLI arguments in the form of key=value.
         """
@@ -168,3 +213,9 @@ class MatterGen(BaseModel):
         # Flatten the dictionary and format as key=value
         return [f"{key}={value}" for key, value in flatten_dict(config)]
     
+    @staticmethod
+    def dict_to_fire_args(config:Dict) -> list:
+        """
+        Convert a nested dictionary into a list of CLI arguments in the form of key=value.
+        """
+        return [f"--{key}={value}" for key, value in config.items()]

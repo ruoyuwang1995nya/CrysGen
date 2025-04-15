@@ -1,6 +1,6 @@
 from typing import Dict
 
-def dict_to_mattergen_args(config: Dict) -> list:
+def dict_to_hydra_args(config: Dict) -> list:
     """
     Convert a nested dictionary into a list of CLI arguments in the form of key=value.
     """
@@ -16,3 +16,10 @@ def dict_to_mattergen_args(config: Dict) -> list:
 
     # Flatten the dictionary and format as key=value
     return [f"{key}={value}" for key, value in flatten_dict(config)]
+
+
+def dict_to_fire_args(config:Dict) -> list:
+    """
+    Convert a nested dictionary into a list of CLI arguments in the form of key=value.
+    """
+    return [f"--{key}={value}" for key, value in config.items()]
