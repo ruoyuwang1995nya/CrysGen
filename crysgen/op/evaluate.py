@@ -11,6 +11,7 @@ from pathlib import Path
 import numpy as np
 import ase
 from ase.io import write
+from tqdm import tqdm
 from pymatgen.io.ase import AseAtomsAdaptor
 from crysgen.utils import set_directory
 from crysgen.evaluation.metrics.evaluator import MetricsEvaluator
@@ -104,7 +105,7 @@ class Evaluate(OP):
             selection_metrics = config.get("selection_criteria", [])
             default_mask = np.array([True] * len(structure_summaries))
             pre_aggregate_masks = [default_mask]
-            for metric, res in metric_results.items():
+            for metric, res in tqdm(metric_results.items()):
                 if metric in selection_metrics:
                     if pre_aggregate_metric := metric_results[metric].get("pre_aggregation_value"):
                         pre_aggregate_masks.append(pre_aggregate_metric)
@@ -126,19 +127,26 @@ class Evaluate(OP):
                 selected_properties[k]=f"{k}.npy"
             
             # update reference
-            reference_entries = [entry for entry in reference_dataset]
-            reference_entries.extend([s.entry for s in selected_structure_summaries])
-            reference_dataset = ReferenceDataset.from_entries(
-                "reference_dataset",
-                reference_entries
-                )
-            LMDBGZSerializer().serialize(reference_dataset, "updated_reference_dataset")
+            update_reference = config.get("update_reference", False)
+            if update_reference:
+                #if not isinstance(reference_dataset, ReferenceDataset):
+                #    raise ValueError("Reference dataset must be of type ReferenceDataset for updating.")
+                reference_entries = [entry for entry in reference_dataset]
+                reference_entries.extend([s.entry for s in selected_structure_summaries])
+                reference_dataset = ReferenceDataset.from_entries(
+                    "reference_dataset",
+                    reference_entries
+                    )
+                LMDBGZSerializer().serialize(reference_dataset, "updated_reference_dataset")
+                reference_dataset = work_dir / "updated_reference_dataset"
+            else:
+                reference_dataset = ip["reference_dataset"]
             
         return OPIO({
             "selected_structures": work_dir / "selected_structures.extxyz",
             "selected_structures_properties": {k: work_dir / v for k, v in selected_properties.items()},
             "results": metric_results,
-            "reference_dataset": work_dir / "updated_reference_dataset",
+            "reference_dataset": reference_dataset,
         })
         
     
