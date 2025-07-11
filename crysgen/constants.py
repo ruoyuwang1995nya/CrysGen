@@ -1,0 +1,5 @@
+FP_TASK_PATTERN = "task.%06d"
+FP_DEFAULT_LOG_NAME = "fp.log"
+FP_DEFAULT_OUT_DATA_NAME = "data"
+FP_INDEX_PATTERN = "%06d"
+DEFAULT_IMAGE = "dptechnology/based"
