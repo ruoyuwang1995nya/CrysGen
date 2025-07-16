@@ -1,5 +1,5 @@
-from crysgen.train.model import BaseModel
-from crysgen.train.utils import dict_to_hydra_args
+from crysgen.generator.model import BaseModel
+from crysgen.generator.utils import dict_to_hydra_args
 from typing import Optional, Union, Dict, List
 from pathlib import Path
 import subprocess

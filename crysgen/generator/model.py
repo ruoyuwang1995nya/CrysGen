@@ -9,7 +9,7 @@ class BaseModel(ABC):
     
     __ModelTypes = {}
     
-    def __init__(self, model:Union[Path,str]=None ):
+    def __init__(self, model:Union[Path,str]=None):
         self._model = model
         self._data_train = None
         self._data_val = None
@@ -66,6 +66,13 @@ class BaseModel(ABC):
         Get all registered model types.
         """
         return BaseModel.__ModelTypes.keys()
+    
+    @abstractmethod
+    def load_model(model:Union[Path,str]):
+        """
+        Load a model from a file.
+        """
+        pass
     
     @abstractmethod
     def get_data(config:Optional[dict]=None):
