@@ -6,7 +6,7 @@ from dflow.python import (
     Artifact,
     Parameter
     )
-from typing import List, Dict
+from typing import Dict
 from pathlib import Path
 import numpy as np
 import ase
@@ -20,9 +20,10 @@ from crysgen.evaluation.reference.reference_dataset_serializer import LMDBGZSeri
 from crysgen.evaluation.utils.metrics_structure_summary import (
     get_metrics_structure_summaries
 )
-from crysgen.evaluation.utils.utils import DiscretePropertyConstraint
 
-class Evaluate(OP):
+import logging
+
+class SUNEvaluate(OP):
     """OP which evaluate and select new structures (It now replace previously seperated OPs)
     
     Args:
@@ -36,12 +37,12 @@ class Evaluate(OP):
     def get_input_sign(cls)-> OPIOSign:
         return OPIOSign(
             {
-                "task_name": BigParameter(str),
+                "task_name": Parameter(str),
                 "structures": Artifact(Path),
-                "reference_dataset": Artifact(Path),
+                "reference_dataset": Artifact(Path,optional=True),
                 "energies": Artifact(Path,optional=True),
                 "properties": BigParameter(Dict[str,Path],optional=True,default={}),
-                "config": BigParameter(dict)
+                "config": Parameter(dict)
             },
         )
         
@@ -52,7 +53,7 @@ class Evaluate(OP):
                 "selected_structures": Artifact(Path),  
                 "selected_structures_properties": Artifact(Path),
                 "results": BigParameter(dict),
-                "reference_dataset": Artifact(Path),
+                #"reference_dataset": Artifact(Path),
             },
         )
         
@@ -62,10 +63,15 @@ class Evaluate(OP):
         ip:OPIO,
         ) -> OPIO:
         structures = ip["structures"]
-        energies = ip["energies"]
-        reference_dataset = ip["reference_dataset"]
-        properties_ls = ip["properties"]
         config = ip["config"]
+        energies = ip["energies"]
+        reference_dataset = ip.get("reference_dataset")
+        if not reference_dataset:
+            reference_dataset = config.get("reference_dataset")
+            print("Using reference dataset from config.")
+        if not reference_dataset:
+            raise ValueError("Reference dataset must be provided either as input artifact or in config.")
+        properties_ls = ip["properties"]
         task_name = ip["task_name"]
         work_dir = Path(task_name)
         # read structures (in xyz format) and properties (in npy format) into structure_summaries
@@ -83,11 +89,8 @@ class Evaluate(OP):
         # prepare referece dataset in ReferenceDataset format
         reference_dataset= LMDBGZSerializer().deserialize(reference_dataset)
         
-        #constraints=config.get("property_constraints")
-        
         with set_directory(work_dir):
         # create metrics evaluator
-        # An evaluator has several metric capabilities at its disposal
             evaluator= MetricsEvaluator.from_structure_summaries(
                     structure_summaries,
                     reference_dataset,
@@ -146,7 +149,7 @@ class Evaluate(OP):
             "selected_structures": work_dir / "selected_structures.extxyz",
             "selected_structures_properties": {k: work_dir / v for k, v in selected_properties.items()},
             "results": metric_results,
-            "reference_dataset": reference_dataset,
+            #"reference_dataset": reference_dataset,
         })
         
     

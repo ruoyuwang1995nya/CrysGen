@@ -22,10 +22,10 @@ class RelaxFF(OP):
     def get_input_sign(cls)-> OPIOSign:
         return OPIOSign(
             {   
-                "task_name": BigParameter(str),
+                "task_name": Parameter(str),
                 "structures": Artifact(Path),
                 "model": Artifact(Path,optional=True),
-                "config": BigParameter(dict),
+                "config": Parameter(dict),
             },
         )
         
@@ -33,7 +33,7 @@ class RelaxFF(OP):
     def get_output_sign(cls) -> OPIOSign:
         return OPIOSign(
             {   
-                "relaxed_structure": Artifact(Path),
+                "relaxed_structures": Artifact(Path),
                 "energies": Artifact(Path),
                 "extra_outputs": Artifact(List[Path])
             },
@@ -46,7 +46,7 @@ class RelaxFF(OP):
     ) -> OPIO:
         # read a list of pymatgen.Structures
         original_structures = ip["structures"]
-        config=ip["config"]
+        config=ip["config"]#.get("ff_relax",{})
         model_file=ip["model"]
         task_name = ip["task_name"]
         work_dir = Path(task_name)
@@ -72,7 +72,7 @@ class RelaxFF(OP):
                 raise RuntimeError("Relaxation failed!") from e
             
         return OPIO({
-            "relaxed_structure": work_dir / relaxed_structure,
+            "relaxed_structures": work_dir / relaxed_structure,
             "energies": work_dir / energies,
             "extra_outputs": [work_dir / x for x in extra_outputs]
         })

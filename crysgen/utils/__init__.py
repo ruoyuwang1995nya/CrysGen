@@ -1,2 +1,3 @@
-from .chdir import set_directory
+from .chdir import set_directory, make_path
 from .run_command import run_command
+from .ase_structure import sort_atoms_by_atomic_number,get_element_types_from_sorted_atoms

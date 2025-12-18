@@ -28,6 +28,9 @@ class MatterSim(BasePotential):
             output_path (str): Path to save the relaxed structure.
             **kwargs: Additional arguments for the relaxation process.
         """
+        if potential:
+            potential = str(potential)
+            print(potential)
         _, energies = relax_structures(
             structures=structures,
             potential_load_path=potential,
