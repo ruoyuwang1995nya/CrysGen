@@ -19,9 +19,9 @@ class Generate(OP):
     def get_input_sign(cls)-> OPIOSign:
         return OPIOSign(
             {
-                "task_name": BigParameter(str),
+                "task_name": Parameter(str),
                 "model": Artifact(Path),
-                "config": BigParameter(dict),
+                "config": Parameter(dict),
             },
         )
         

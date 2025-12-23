@@ -109,15 +109,15 @@ class SolidElectrolyteMatterGen(Steps):
             "vasp_config": InputParameter(), # BigParameter, includes all eval settings
         }
         self._input_artifacts = {
-            "structures": InputArtifact(Path,optional=True),
-            "reference_dataset": InputArtifact(Path, optional=True),
-            "model": InputArtifact(Path, optional=True),
+            "structures": InputArtifact(optional=True),
+            "reference_dataset": InputArtifact(optional=True),
+            "model": InputArtifact(optional=True),
         }
         self._output_parameters = {
             "results": OutputParameter(), # BigParameter(dict), all evaluation results
         }
         self._output_artifacts = {
-            "structures": OutputArtifact(Path, optional=True),
+            "structures": OutputArtifact(optional=True),
         }
 
         super().__init__(
@@ -140,7 +140,6 @@ class SolidElectrolyteMatterGen(Steps):
         ## Initial relaxation with force field
         ff_config, ff_template_config, ff_executor = _pop_executor(ff_step_config)
         ff_template_slice_config = ff_config.pop("template_slice_config", {})
-        print(ff_template_slice_config)
         sun_eval_config, sun_eval_template_config, sun_eval_executor = _pop_executor(sun_eval_step_config)
         dft_config, dft_template_config, dft_executor = _pop_executor(dft_step_config)
         dft_template_slice_config = dft_config.pop("template_slice_config", {})
@@ -276,6 +275,7 @@ class SolidElectrolyteMatterGen(Steps):
                 },
             key="--".join(["%s"%steps.inputs.parameters["name"], "select-vasp"]),
             executor=sun_eval_executor,
+            **sun_eval_config                                                                   
         )
         steps.add(select_vasp)
         
@@ -333,6 +333,7 @@ class SolidElectrolyteMatterGen(Steps):
                     **ff_template_slice_config,
                 ),
                 python_packages=upload_python_packages,
+                **ff_template_config,
                 ),
             parameters={
                 "task_name": distribute_structures.outputs.parameters["idx_ls"],

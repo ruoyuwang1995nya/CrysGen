@@ -144,6 +144,23 @@ class IonMD(OP):
         
         # get atoms
         atoms = read(structure_path)
+        
+        # Create supercell if specified in config
+        supercell = config.get("supercell", None)
+        if supercell:
+            from ase.build import make_supercell
+            if isinstance(supercell, list) and len(supercell) == 3:
+                # Simple [nx, ny, nz] format
+                atoms = atoms * supercell
+                logging.info(f"Created supercell {supercell}, new cell has {len(atoms)} atoms")
+            elif isinstance(supercell, list) and len(supercell) == 9:
+                # 3x3 transformation matrix (flattened)
+                matrix = np.array(supercell).reshape(3, 3)
+                atoms = make_supercell(atoms, matrix)
+                logging.info(f"Created supercell with transformation matrix, new cell has {len(atoms)} atoms")
+            else:
+                logging.warning(f"Invalid supercell format: {supercell}, skipping supercell creation")
+        
         with set_directory(Path(task_name)):
             calc_cfg = dict(config.get("calculator", {}))
             calc_style = calc_cfg.pop("style", "mattersim")

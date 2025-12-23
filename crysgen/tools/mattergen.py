@@ -8,6 +8,10 @@ from pathlib import Path
 from shutil import copy
 from typing import Dict, List, Optional, Union
 import logging
+from ase.io import read, write
+from ase import Atoms
+import numpy as np
+import json
 
 from .base_tools import Tools
 
@@ -32,6 +36,169 @@ def _dict_to_hydra_args(config: Dict) -> list:
 
     return [f"{key}={value}" for key, value in flatten_dict(config)]
 
+
+@Tools.register("mattergen_data")
+def mattergen_data(
+    ase_extxyz_file: Union[str,Path],
+    mattergen_data: Union[str,Path],
+    properties: Optional[List[str]] = [],
+    )->str:
+    """Transform ase.extxyz file to mattergen data format.
+    
+    Saves structures as separate .npy files:
+    - cell.npy: (N, 3, 3) lattice vectors
+    - pos.npy: (total_atoms, 3) concatenated positions
+    - num_atoms.npy: (N,) atom counts per structure
+    - atomic_numbers.npy: (total_atoms,) concatenated atomic numbers
+    - structure_id.npy: (total_atoms,) structure index for each atom
+    """
+    
+    atoms_ls = read(ase_extxyz_file,":")
+    if isinstance(mattergen_data,str):
+        mattergen_data = Path(mattergen_data)
+    mattergen_data.mkdir(parents=True,exist_ok=True)
+    num_structures = len(atoms_ls)
+    
+    # Prepare arrays
+    cells = []
+    positions = []
+    num_atoms = []
+    atomic_numbers = []
+    structure_ids = []
+    properties_data = {prop: {'values':[],'property_source_doc_id':prop,'origins':None} for prop in properties}
+    for idx, atoms in enumerate(atoms_ls):
+        cells.append(atoms.get_cell().array)
+        positions.append(atoms.get_positions())
+        num_atoms.append(len(atoms))
+        atomic_numbers.append(atoms.get_atomic_numbers())
+        if atoms.info.get("structure_id") is not None:
+            structure_ids.append(atoms.info["structure_id"])
+        else:
+            structure_ids.append("%06d"%idx)
+        for prop in properties:
+            if prop in atoms.info:
+                properties_data[prop]['values'].append(atoms.info[prop])
+            else:
+                properties_data[prop]['values'].append(None)
+                logging.warning(f"Property '{prop}' not found in structure {idx}.")
+    
+    # Convert to numpy arrays
+    cells_array = np.array(cells)  # (N, 3, 3)
+    pos_array = np.vstack(positions)  # (total_atoms, 3)
+    num_atoms_array = np.array(num_atoms, dtype=np.int32)  # (N,)
+    atomic_numbers_array = np.concatenate(atomic_numbers)  # (total_atoms,)
+    structure_id_array = np.array(structure_ids)#np.concatenate(structure_ids)  # (total_atoms,)
+    
+    # Save to disk
+    np.save(mattergen_data / "cell.npy", cells_array)
+    np.save(mattergen_data / "pos.npy", pos_array)
+    np.save(mattergen_data / "num_atoms.npy", num_atoms_array)
+    np.save(mattergen_data / "atomic_numbers.npy", atomic_numbers_array)
+    np.save(mattergen_data / "structure_id.npy", structure_id_array)
+    
+    for prop in properties:
+        with open(mattergen_data / f"{prop}.json", 'w') as f:
+            json.dump(properties_data[prop], f, indent=4)
+    
+    logging.info(f"Saved {num_structures} structures to {mattergen_data}")
+    logging.info(f"Total atoms: {len(pos_array)}")
+    
+    return str(mattergen_data)
+
+@Tools.register("mattergen2ase")
+def mattergen2ase(
+    mattergen_data: Union[str, Path],
+    ase_extxyz_file: Union[str, Path],
+    properties: Optional[List[str]] = None,
+) -> str:
+    """Transform mattergen data format to ase.extxyz file.
+    
+    Reads structures from separate .npy files:
+    - cell.npy: (N, 3, 3) lattice vectors
+    - pos.npy: (total_atoms, 3) concatenated positions
+    - num_atoms.npy: (N,) atom counts per structure
+    - atomic_numbers.npy: (total_atoms,) concatenated atomic numbers
+    - structure_id.npy: (N,) structure IDs
+    - {property}.json: optional property data
+    
+    Args:
+        mattergen_data: Path to directory containing MatterGen .npy files
+        ase_extxyz_file: Output path for extxyz file
+        properties: Optional list of property names to read from .json files
+    
+    Returns:
+        Path to the created extxyz file
+    """
+    if isinstance(mattergen_data, str):
+        mattergen_data = Path(mattergen_data)
+    
+    if not mattergen_data.exists():
+        raise ValueError(f"MatterGen data directory does not exist: {mattergen_data}")
+    
+    # Load numpy arrays
+    cells = np.load(mattergen_data / "cell.npy")  # (N, 3, 3)
+    positions = np.load(mattergen_data / "pos.npy")  # (total_atoms, 3)
+    num_atoms = np.load(mattergen_data / "num_atoms.npy")  # (N,)
+    atomic_numbers = np.load(mattergen_data / "atomic_numbers.npy")  # (total_atoms,)
+    
+    # Load structure IDs if available
+    structure_id_file = mattergen_data / "structure_id.npy"
+    if structure_id_file.exists():
+        structure_ids = np.load(structure_id_file)
+    else:
+        structure_ids = [f"{i:06d}" for i in range(len(num_atoms))]
+    
+    # Load properties if specified
+    properties_data = {}
+    if properties:
+        for prop in properties:
+            prop_file = mattergen_data / f"{prop}.json"
+            if prop_file.exists():
+                with open(prop_file, 'r') as f:
+                    properties_data[prop] = json.load(f)
+            else:
+                logging.warning(f"Property file not found: {prop_file}")
+    
+    # Reconstruct individual Atoms objects
+    atoms_list = []
+    atom_offset = 0
+    
+    for i in range(len(num_atoms)):
+        n_atoms = num_atoms[i]
+        
+        # Extract data for this structure
+        cell = cells[i]
+        pos = positions[atom_offset:atom_offset + n_atoms]
+        nums = atomic_numbers[atom_offset:atom_offset + n_atoms]
+        
+        # Create Atoms object
+        atoms = Atoms(
+            numbers=nums,
+            positions=pos,
+            cell=cell,
+            pbc=True
+        )
+        
+        # Add structure ID to info
+        atoms.info["structure_id"] = str(structure_ids[i])
+        
+        # Add properties to info
+        for prop, prop_data in properties_data.items():
+            if 'values' in prop_data and i < len(prop_data['values']):
+                value = prop_data['values'][i]
+                if value is not None:
+                    atoms.info[prop] = value
+        
+        atoms_list.append(atoms)
+        atom_offset += n_atoms
+    
+    # Write to extxyz file
+    write(ase_extxyz_file, atoms_list)
+    
+    logging.info(f"Converted {len(atoms_list)} structures from {mattergen_data} to {ase_extxyz_file}")
+    logging.info(f"Total atoms: {len(positions)}")
+    
+    return str(ase_extxyz_file)
 
 @Tools.register("mattergen_train")
 def mattergen_train(

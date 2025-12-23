@@ -4,6 +4,7 @@ from dflow.python import (
     OPIOSign, 
     BigParameter,
     Artifact,
+    Parameter
     )
 from pathlib import Path
 from typing import List, Dict, Union, Optional, Any
@@ -20,8 +21,8 @@ class Train(OP):
     def get_input_sign(cls)-> OPIOSign:
         return OPIOSign(
             {
-                "task_name": BigParameter(str),
-                "config": BigParameter(Dict[str,Any]),
+                "task_name": Parameter(str),
+                "config": Parameter(Dict[str,Any]),
                 "base_model": Artifact(Path,optional=True),
                 "training_data": Artifact(Path),
                 "valid_data": Artifact(Path,optional=True),

@@ -125,11 +125,14 @@ class PrepVasp(PrepFp):
         task_paths = []
         inputs = config["inputs"]
         for ii in range(len(confs)):
-            ss = confs[ii]
-            # loop over frames
-            nn, pp = self._exec_one_frame(counter, inputs, ss)
-            task_names.append(nn)
-            task_paths.append(pp)
+            try:
+                ss = confs[ii]
+                nn, pp = self._exec_one_frame(counter, inputs, ss)
+                task_names.append(nn)
+                task_paths.append(pp)
+            except Exception as e:
+                logging.error(f"Error processing frame {ii}: {e}")
+                #continue
             counter += 1
 
         return task_names, task_paths

@@ -21,7 +21,6 @@ from crysgen.evaluation.utils.metrics_structure_summary import (
     get_metrics_structure_summaries
 )
 
-import logging
 
 class SUNEvaluate(OP):
     """OP which evaluate and select new structures (It now replace previously seperated OPs)
@@ -133,7 +132,6 @@ class SUNEvaluate(OP):
             update_reference = config.get("update_reference", False)
             if update_reference:
                 #if not isinstance(reference_dataset, ReferenceDataset):
-                #    raise ValueError("Reference dataset must be of type ReferenceDataset for updating.")
                 reference_entries = [entry for entry in reference_dataset]
                 reference_entries.extend([s.entry for s in selected_structure_summaries])
                 reference_dataset = ReferenceDataset.from_entries(

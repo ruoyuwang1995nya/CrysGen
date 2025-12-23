@@ -24,6 +24,7 @@ from dflow.python import (
     BigParameter,
     Parameter,
     OPIOSign,
+    FatalError
 )
 
 
@@ -94,6 +95,8 @@ class PrepFp(OP, ABC):
             confs=confs_ls,
             config=config,
         )
+        if len(task_paths) == 0:
+            raise FatalError("No valid FP tasks were created.")
         return OPIO(
             {
                 "task_names": task_names,

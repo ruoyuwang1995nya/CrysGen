@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional,List
 
 from dflow import (
     InputArtifact,
@@ -38,22 +38,23 @@ class TrainGeneration(Steps, ABC):
     ):
         self._input_parameters = {
             "name": InputParameter(type=str), # Block id
-            "train_config": InputParameter(), # BigParameter, includes all eval settings
-            "generate_config": InputParameter(), # BigParameter, includes all eval settings
+            "train_config": InputParameter(), # BigParameter, includes all training settings
+            "generate_config": InputParameter(), # BigParameter, includes all generation settings
+            "data_config": InputParameter(), # BigParameter, includes all data preparation settings
         }
         self._input_artifacts = {
             #"generated_structures": InputArtifact(Path), # path to generated structures
-            "model": InputArtifact(Path), # path to pretrained model
-            "training_data": InputArtifact(Path), # path to training data
-            "valid_data": InputArtifact(Path, optional=True), # path to validation data
-            "test_data": InputArtifact(Path, optional=True), # path to test data
+            "model": InputArtifact(), # path to pretrained model
+            "training_data": InputArtifact(), # path to training data
+            "valid_data": InputArtifact(optional=True), # path to validation data
+            "test_data": InputArtifact(optional=True), # path to test data
         }
         self._output_parameters = {
             "results": OutputParameter(value={}), # BigParameter(dict), all evaluation results
         }
         self._output_artifacts = {
-            "generated_structures": OutputArtifact(Path, optional=True),
-            "model": OutputArtifact(Path, optional=True)
+            "generated_structures": OutputArtifact(optional=True),
+            "model": OutputArtifact(optional=True)
         }
 
         super().__init__(
