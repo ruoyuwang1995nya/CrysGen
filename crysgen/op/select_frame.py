@@ -9,6 +9,7 @@ from dflow.python import (
 from pathlib import Path
 from typing import List,Dict
 from crysgen.tools import Tools
+import logging
 
 
 class SelectFrame(OP):
@@ -68,6 +69,7 @@ class SelectFrame(OP):
 
         output_path = Path("selected_structures.extxyz")
         if selected_atoms:
+            logging.info(f"Selected {len(selected_atoms)} structures out of {len(atoms_ls)}")
             write(output_path, selected_atoms, format="extxyz")
         else:
             # still write an empty file to satisfy downstream expectations

@@ -27,13 +27,28 @@ def load_config(config_path: Path) -> dict:
         return json.load(f)
 
 
-def setup_python_packages() -> List[str]:
-    """Setup Python packages to upload."""
+def setup_python_packages(module_names: List[str]) -> List[str]:
+    """Setup Python packages to upload.
+    
+    Args:
+        module_names: List of module names to check and upload
+        
+    Returns:
+        List of package paths to upload
+    """
+    import importlib
+    
     upload_python_packages = []
-    upload_python_packages.extend(list(dflow.__path__))
-    upload_python_packages.extend(list(ase.__path__))
-    upload_python_packages.extend(list(crysgen.__path__))
-    upload_python_packages.extend(list(dpdata.__path__))
+    for module_name in module_names:
+        try:
+            module = importlib.import_module(module_name)
+            if hasattr(module, '__path__'):
+                upload_python_packages.extend(list(module.__path__))
+            else:
+                print(f"Warning: Module '{module_name}' has no __path__ attribute")
+        except ImportError:
+            print(f"Warning: Module '{module_name}' not found in current environment")
+    
     return upload_python_packages
 
 
@@ -135,7 +150,8 @@ def build_workflow(config: dict) -> Workflow:
         Configured Workflow object (not yet submitted)
     """
     # Setup Python packages
-    upload_python_packages = setup_python_packages()
+    module_names = config.get("upload_python_packages", [])
+    upload_python_packages = setup_python_packages(module_names)
     
     # Build step configs
     (default_step_config, train_step_config,  vasp_step_config, ion_md_step_config,sun_eval_step_config,

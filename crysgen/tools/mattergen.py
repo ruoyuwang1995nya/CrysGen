@@ -279,7 +279,7 @@ def mattergen_train(
                 *additional_args,
             ]
         if venv:
-            cmd.insert(0, f"source {venv}/bin/activate && ")
+            cmd.insert(0, f"source {venv}bin/activate && ")
             cmd_str = " ".join(cmd)
             subprocess.run(cmd_str, check=True, shell=True, env=env, executable="/bin/bash")
         else:
@@ -321,19 +321,18 @@ def mattergen_generate(
     *,
     model_path: Union[str, Path],
     results_dir: Union[str, Path] = "./",
-    arguments: Dict = {},
-    additional_args: List = [],
     custom_cmd: Optional[str] = None,
     env: Dict = {},
     venv: Optional[str] = None,
+    **kwargs
 ) -> tuple:
     """Run MatterGen generation using an existing model.
 
     Returns (generated_structures_path, extra_outputs).
     """
 
-    arguments = arguments or {}
-    additional_args = additional_args or []
+    arguments = kwargs
+    additional_args = arguments.pop("additional_args", [])
     env = env or {}
 
     model_path = model_path if isinstance(model_path, Path) else Path(model_path)
