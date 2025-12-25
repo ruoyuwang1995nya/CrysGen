@@ -102,41 +102,31 @@ def build_artifacts(config: dict) -> dict:
             artifacts["generative_model"] = get_artifact_from_uri(generative_model)
         except ValueError:
             artifacts["generative_model"] = upload_artifact_and_print_uri(generative_model, "generative_model")
-    else:
-        artifacts["generative_model"] = upload_artifact([])
     
     if ff_model := config.get("ff_model"):
         try:
             artifacts["ff_model"] = get_artifact_from_uri(ff_model)
         except ValueError:
             artifacts["ff_model"] = upload_artifact_and_print_uri(ff_model, "ff_model")
-    else:
-        artifacts["ff_model"] = upload_artifact([])
     
     if valid_data := config.get("valid_data"):
         try:
             artifacts["valid_data"] = get_artifact_from_uri(valid_data)
         except ValueError:
             artifacts["valid_data"] = upload_artifact_and_print_uri(valid_data, "valid_data")
-    #else:
-    #    artifacts["valid_data"] = upload_artifact([])
     
     if test_data := config.get("test_data"):
         try:
             artifacts["test_data"] = get_artifact_from_uri(test_data)
         except ValueError:
             artifacts["test_data"] = upload_artifact_and_print_uri(test_data, "test_data")
-    else:
-        artifacts["test_data"] = upload_artifact([])
     
     if reference_dataset := config.get("reference_dataset"):
         try:
             artifacts["reference_dataset"] = get_artifact_from_uri(reference_dataset)
         except ValueError:  
             artifacts["reference_dataset"] = upload_artifact_and_print_uri(reference_dataset, "reference_dataset")
-    else:
-        artifacts["reference_dataset"] = upload_artifact([])    
-    
+ 
     return artifacts
 
 
