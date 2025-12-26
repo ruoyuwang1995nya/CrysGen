@@ -2,16 +2,15 @@ from dflow.python import (
     OP, 
     OPIO, 
     OPIOSign, 
-    BigParameter,
     Artifact,
-    Parameter
+    Parameter,
+    BigParameter
     )
 from pathlib import Path
-from typing import List
-import ase
-from pymatgen.io.ase import AseAtomsAdaptor
 from crysgen.utils import set_directory
-from crysgen.ff.potential import BasePotential
+from crysgen.tools import Tools
+from typing import Dict, Any
+
 
 class RelaxFF(OP):
     """Relax a structure using the trained model."""
@@ -22,7 +21,7 @@ class RelaxFF(OP):
     def get_input_sign(cls)-> OPIOSign:
         return OPIOSign(
             {   
-                "task_name": Parameter(str),
+                "task_name": Parameter(str,default="relaxation"),
                 "structures": Artifact(Path),
                 "model": Artifact(Path,optional=True),
                 "config": Parameter(dict),
@@ -35,7 +34,7 @@ class RelaxFF(OP):
             {   
                 "relaxed_structures": Artifact(Path),
                 "energies": Artifact(Path),
-                "extra_outputs": Artifact(List[Path])
+                "extra_outputs": BigParameter(Dict[str,Any]),
             },
         )
         
@@ -45,24 +44,16 @@ class RelaxFF(OP):
         ip: OPIO
     ) -> OPIO:
         # read a list of pymatgen.Structures
-        original_structures = ip["structures"]
+        structures = ip["structures"]
+        #print(structures)
         config=ip["config"]#.get("ff_relax",{})
         model_file=ip["model"]
         task_name = ip["task_name"]
         work_dir = Path(task_name)
-        try:
-            ase_atoms = ase.io.read(original_structures, ":")
-            structures = [AseAtomsAdaptor.get_structure(x) for x in ase_atoms]
-        except Exception as e:
-            print(f"Failed to read structure files!: {e}")
-            raise RuntimeError("Failed to read structure files!") from e
-        
-        potential_type=config.pop("potential_type")
-        potential=BasePotential.get_model(potential_type)
-        potential=potential()
+        relaxer=config.pop("relaxer")
         with set_directory(work_dir):
             try:
-                relaxed_structure, energies, extra_outputs = potential.relax(
+                relaxed_structure, energies, extra_outputs = Tools.get(relaxer)(
                     structures=structures,
                     potential=model_file,
                     **config
@@ -74,5 +65,5 @@ class RelaxFF(OP):
         return OPIO({
             "relaxed_structures": work_dir / relaxed_structure,
             "energies": work_dir / energies,
-            "extra_outputs": [work_dir / x for x in extra_outputs]
+            "extra_outputs": extra_outputs,
         })

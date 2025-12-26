@@ -10,7 +10,8 @@ import dpdata
 
 import ase
 import dflow
-from dflow import Workflow, Step, upload_artifact
+from dflow import Workflow, Step
+import logging
 
 import crysgen
 from crysgen.entrypoint.common import global_config_workflow
@@ -20,6 +21,7 @@ from crysgen.superop.evaluate.solid_electrolyte import SolidElectrolyteMatterGen
 from crysgen.op.fp.vasp_input import VaspInputs
 from crysgen.utils.workflow_query import get_resubmit_keys, print_steps, parse_index_string, get_steps_by_indices, get_steps_by_indices
 from crysgen.utils.artifacts import upload_artifact_and_print_uri, get_artifact_from_uri
+from crysgen.utils.download_artifacts import download_step_artifacts
 
 def load_config(config_path: Path) -> dict:
     """Load configuration from JSON file."""
@@ -288,6 +290,83 @@ def resubmit_workflow(args):
         print(f"Workflow ID saved to {args.save_wf_id}")
 
 
+def download_workflow(args):
+    """Download artifacts from workflow steps."""
+    config = load_config(args.config)
+    
+    # Setup dflow mode
+    #dflow.config["mode"] = config.get("dflow_mode", "debug")
+    global_config_workflow(config)
+    
+    # Get workflow
+    wf = Workflow(id=args.workflow_id)
+    
+    # Get all available steps
+    all_step_keys = get_resubmit_keys(
+        wf,
+        unsuccessful_step_keys=args.include_failed
+    )
+    
+    print(f"Found {len(all_step_keys)} available steps in workflow {args.workflow_id}")
+    
+    # If list_steps flag is set, print steps and exit
+    if args.list_steps:
+        print("\nAvailable steps:")
+        print_steps(all_step_keys)
+        return
+    
+    # Select steps by indices if provided
+    if args.step_indices:
+        step_keys = get_steps_by_indices(all_step_keys, args.step_indices)
+        print(f"Selected {len(step_keys)} steps to download")
+    else:
+        step_keys = all_step_keys
+        print(f"Downloading all {len(step_keys)} steps")
+    
+    if args.verbose:
+        print("\nSteps to download:")
+        print_steps(step_keys)
+    
+    # Set output directory
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Query and download steps
+    print(f"\nDownloading to: {output_dir.absolute()}")
+    
+    for step_key in step_keys:
+        print(f"\nProcessing step: {step_key}")
+        steps = wf.query_step(key=step_key)
+        
+        if len(steps) == 0:
+            logging.warning(f"  Step '{step_key}' not found, skipping")
+            continue
+        
+        step = steps[0]
+        
+        # Check if step succeeded (unless include_failed is True)
+        if not args.include_failed and step.phase != "Succeeded":
+            logging.warning(f"  Step '{step_key}' status is {step.phase}, skipping")
+            continue
+        
+        # Download artifacts
+        try:
+            download_step_artifacts(
+                step,
+                step_key,
+                output_dir,
+                download_inputs=args.inputs,
+                download_outputs=args.outputs,
+            )
+        except Exception as e:
+            logging.error(f"  Failed to download step '{step_key}': {e}")
+            if args.verbose:
+                import traceback
+                traceback.print_exc()
+    
+    print(f"\nDownload complete. Artifacts saved to: {output_dir.absolute()}")
+
+
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(
@@ -298,17 +377,26 @@ Examples:
   # Submit new workflow
   %(prog)s submit -c config.json
   
-  # Query workflow status
-  %(prog)s query wf-xxxxx -v
-  
   # List reusable steps
-  %(prog)s list-steps wf-xxxxx -c config.json
+  %(prog)s resubmit wf-xxxxx -c config.json -l
   
   # Resubmit with all steps
   %(prog)s resubmit wf-xxxxx -c config.json
   
   # Resubmit with selective steps (by index)
   %(prog)s resubmit wf-xxxxx -c config.json -u "0-5,10,15-17"
+  
+  # List available steps for download
+  %(prog)s download wf-xxxxx -l
+  
+  # Download all artifacts from all steps
+  %(prog)s download wf-xxxxx -o ./my-downloads
+  
+  # Download specific steps by index
+  %(prog)s download wf-xxxxx -s "0-5,10" -o ./my-downloads
+  
+  # Download only outputs (no inputs)
+  %(prog)s download wf-xxxxx --no-inputs -s "0-5"
         """
     )
     
@@ -378,6 +466,79 @@ Examples:
         args.step_indices = parse_index_string(args.indices)
     
     resubmit_parser.set_defaults(func=lambda args: (parse_indices(args), resubmit_workflow(args)))
+    
+    # Download command
+    download_parser = subparsers.add_parser('download', help='Download artifacts from workflow steps')
+    download_parser.add_argument(
+        'workflow_id',
+        type=str,
+        help='Workflow ID to download artifacts from'
+    )
+    download_parser.add_argument(
+        '-c', '--config',
+        type=Path,
+        required=True,
+        help='Path to JSON configuration file'
+    )
+    download_parser.add_argument(
+        '-o', '--output-dir',
+        type=str,
+        default='./downloads',
+        help='Output directory for downloaded artifacts (default: ./downloads)'
+    )
+    download_parser.add_argument(
+        '-s', '--indices',
+        type=str,
+        help='Step indices to download. Supports comma-separated values and ranges (e.g., "0-5,10,15-17"). If not specified, all steps are downloaded.'
+    )
+    download_parser.add_argument(
+        '-l', '--list-steps',
+        action='store_true',
+        help='List available steps and exit without downloading'
+    )
+    download_parser.add_argument(
+        '--inputs',
+        action='store_true',
+        default=True,
+        help='Download input artifacts (default: True)'
+    )
+    download_parser.add_argument(
+        '--outputs',
+        action='store_true',
+        default=True,
+        help='Download output artifacts (default: True)'
+    )
+    download_parser.add_argument(
+        '--no-inputs',
+        action='store_false',
+        dest='inputs',
+        help='Do not download input artifacts'
+    )
+    download_parser.add_argument(
+        '--no-outputs',
+        action='store_false',
+        dest='outputs',
+        help='Do not download output artifacts'
+    )
+    download_parser.add_argument(
+        '--include-failed',
+        action='store_true',
+        help='Include failed/unsuccessful steps when listing/downloading'
+    )
+    download_parser.add_argument(
+        '-v', '--verbose',
+        action='store_true',
+        help='Show detailed information'
+    )
+    
+    # Parse indices for download command
+    def parse_download_indices(args):
+        if not hasattr(args, 'indices') or not args.indices:
+            args.step_indices = None
+            return
+        args.step_indices = parse_index_string(args.indices)
+    
+    download_parser.set_defaults(func=lambda args: (parse_download_indices(args), download_workflow(args)))
     
     args = parser.parse_args()
     
