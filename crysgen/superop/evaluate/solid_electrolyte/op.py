@@ -19,6 +19,7 @@ from crysgen.tools.ase_calculator import CalculatorWrapper
 from crysgen.tools.ase_md import MDRunner
 import numpy as np
 import logging
+import json
 from copy import copy
 
 class SelectFrameVaspSolidElectrolyte(OP):
@@ -92,8 +93,10 @@ class SelectFrameVaspSolidElectrolyte(OP):
         output_path = Path("selected_structures.extxyz")
         if atoms_ls:
             write(output_path, atoms_ls, format="extxyz")
+            logging.info(f"Selected {len(atoms_ls)} structures out of {len(outcar_ls)} based on criteria.")
         else:
             output_path.write_text("")
+            logging.info("No structures selected based on criteria.")
 
         energies_path = Path("energies.npy")
         np.save(energies_path, np.array(energies, dtype=float))
@@ -126,7 +129,9 @@ class IonMD(OP):
         return OPIOSign(
             {
                 "traj": Artifact(Path),
-                "results": Parameter(Dict),
+                #"results": Parameter(Dict),
+                "structure": Artifact(Path),
+                "results": Artifact(Path),
             },
         )
         
@@ -179,12 +184,14 @@ class IonMD(OP):
                     log_dir=log_dir,
                     traj_dir=traj_dir,
                 )
+                with open("md_results.json", "w") as f:
+                    json.dump(res["analysis"], f, indent=4)
             except Exception as e:
                 raise TransientError(f"MD simulation failed: {e}")
 
         return OPIO({
             "traj": res["last_traj"],
-            "results": res["analysis"]})
+            "results": Path(task_name)/"md_results.json"})
     
 class SelectFrameIonMD(OP):
     def __init__(self):
@@ -195,7 +202,7 @@ class SelectFrameIonMD(OP):
         return OPIOSign(
             {
                 "structures": Artifact(List[Path]),
-                "results": Parameter(List[Dict]),
+                "results": Artifact(List[Path]),
                 "config": Parameter(Dict)  # config for criteria
             },
         )
@@ -205,7 +212,7 @@ class SelectFrameIonMD(OP):
         return OPIOSign(
             {
                 "selected_structures": Artifact(Path),
-                "selected_results": Parameter(List[Dict])
+                "selected_results": Artifact(List[Path])
             },
         )
         
@@ -216,15 +223,17 @@ class SelectFrameIonMD(OP):
     ) -> OPIO:
         structures: List[Path] = ip["structures"]
         config: Dict[str, Any] = ip["config"]
-        results: List[Dict] = ip["results"]
+        results: List[Path] = ip["results"]
         selected_structures = []
-        selected_results = []
+        selected_results = {}
         upper=config.get("li_above", 1e-6) # to cm^2/s
         lower=config.get("other_below", 1e-7)
-        scale = 100 # to cm^2/s
+        scale = 1 # to cm^2/s
         
-        for idx, (structure, res) in enumerate(zip(structures, results)):
+        for idx, (structure, res_path) in enumerate(zip(structures, results)):
             try:
+                with open(res_path, "r") as f:
+                    res = json.load(f)
                 if res["diff"].get("Li"):
                     print(res["diff"]["Li"])
                     if res["diff"]["Li"][0]*scale > upper and all(res["diff"][ele][0]*scale < lower for ele in res["diff"] if ele != "Li"):
@@ -236,13 +245,16 @@ class SelectFrameIonMD(OP):
                             "idx": "%06d"%idx})
                         name = f"selected_{idx:06d}_{composition}.extxyz"
                         write(name, atoms)
-                        selected_results.append(res_tmp)
+                        selected_results[f"{idx:06d}"] = res_tmp
                         selected_structures.append(Path(name))
                         logging.INFO(f"Task {idx} {composition} has Li+ diffusion coefficient: {res['Li']:.2e} cm²/s")
             except Exception as e:
                 logging.WARNING(f"Failed to process structure {structure}!: {e}")
                 continue
+        logging.INFO(f"Selected {len(selected_structures)} structures based on ion diffusion criteria.")
+        with open("selected_results.json", "w") as f:
+            json.dump(selected_results, f, indent=4)
         return OPIO({
             "selected_structures": selected_structures,
-            "selected_results": selected_results
+            "selected_results": Path("selected_results.json")
         })

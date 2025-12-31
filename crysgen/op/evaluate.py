@@ -109,7 +109,9 @@ class SUNEvaluate(OP):
             pre_aggregate_masks = [default_mask]
             for metric, res in tqdm(metric_results.items()):
                 if metric in selection_metrics:
-                    if pre_aggregate_metric := metric_results[metric].get("pre_aggregation_value"):
+                    pre_aggregate_metric = metric_results[metric].get("pre_aggregation_values")
+                    if pre_aggregate_metric is not None:
+                        print("filtering with metric:", metric)
                         pre_aggregate_masks.append(pre_aggregate_metric)
             mask= np.logical_and.reduce(pre_aggregate_masks)
             selected_structure_summaries = [s for s, m in zip(structure_summaries, mask) if m]

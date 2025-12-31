@@ -14,7 +14,7 @@ dependencies = [
     "pydflow>=1.8.132",
     "dpdata>=0.2.24",
     "pymatgen>=2024.6.4",
-    "ase>=3.25.0",
+    "ase==3.25.0",
 ]
 [project.scripts]
 crysgen-solid-electrolyte = "crysgen.entrypoint.se_generate_screen:main"

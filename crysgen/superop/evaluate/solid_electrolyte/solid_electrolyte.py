@@ -292,9 +292,9 @@ class SolidElectrolyteMatterGen(Steps):
                 "task_name": "sun_eval_vasp"
                 },
             artifacts={
-                "structures":relax.outputs.artifacts["relaxed_structures"],
+                "structures":select_vasp.outputs.artifacts["selected_structures"],
                 "reference_dataset": steps.inputs.artifacts["reference_dataset"],
-                "energies": relax.outputs.artifacts["energies"],
+                "energies": select_vasp.outputs.artifacts["energies"],
                 },
             key="--".join(["%s"%steps.inputs.parameters["name"], "sun-eval-vasp"]),
             executor=sun_eval_executor,

@@ -480,7 +480,7 @@ class MDRunner:
             # Convert from ASE internal units to cm²/s
             D_cm2_s = diff_coeffs_raw[0][idx] * units.fs * 0.1
             D_err_cm2_s = diff_coeffs_raw[1][idx] * units.fs * 0.1
-            diffusion[element] = [D_cm2_s, D_err_cm2_s]
+            diffusion[element] = [D_cm2_s.item(), D_err_cm2_s.item()]
 
             # Compute conductivity in S/cm
             D_m2_s = D_cm2_s * 1e-4  # cm²/s to m²/s
@@ -489,15 +489,15 @@ class MDRunner:
             n_indices = sum(1 for sym in symbols if sym == element)
             n_number_density = n_indices / volume_m3
             sigma = n_number_density * (q_coul ** 2) * D_m2_s / (units.kB * temperature_K)
-            conductivity[element] = sigma*1e-2 # S/cm
+            conductivity[element] = sigma.item()*1e-2 # S/cm
 
         total_sigma = sum(conductivity.values())
 
         return {
             "temp": temperature_K,
             "diff": diffusion,  # cm²/s with [value, error]
-            "sigma": conductivity,  # S/m
-            "total_sigma": total_sigma,  # S/m
+            "sigma": conductivity,  # S/cm
+            "total_sigma": total_sigma,  # S/cm
         }
 
 

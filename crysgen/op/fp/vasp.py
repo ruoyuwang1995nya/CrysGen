@@ -1,6 +1,4 @@
-import json
 import logging
-import os
 import re
 from pathlib import (
     Path,
@@ -14,26 +12,15 @@ from typing import (
     Union,
 )
 
-import numpy as np
 from dargs import (
     Argument,
-    ArgumentEncoder,
-    Variant,
-    dargs,
 )
 from dflow.python import (
-    OP,
-    OPIO,
-    Artifact,
-    BigParameter,
-    FatalError,
-    OPIOSign,
     TransientError,
 )
 
 from ase import Atoms
 from ase.io import read, write
-import dpdata
 
 from crysgen.constants import (
     fp_default_log_name,
@@ -173,7 +160,7 @@ class PrepVasp(PrepFp):
         #if vasp_inputs.kgamma
         incar_dict["KGAMMA"] = ".TRUE." if vasp_inputs.kgamma else ".FALSE."
         incar_dict["KSPACING"] = vasp_inputs.kspacing
-        if np.any(init_magmoms):
+        if any(init_magmoms):
             incar_dict["MAGMOM"] = " ".join([str(x) for x in init_magmoms])
         incar = dumps_incar(incar_dict)
         Path(vasp_input_name).write_text(incar)

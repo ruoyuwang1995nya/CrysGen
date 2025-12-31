@@ -3,15 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Union, List, Optional
+from typing import Union
 import logging
 import numpy as np
 
-from ase import Atoms
 from ase.io import read, write
-from pymatgen.core import Structure
-from pymatgen.io.ase import AseAtomsAdaptor
-
 from .base_tools import Tools
 
 

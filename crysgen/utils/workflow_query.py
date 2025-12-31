@@ -21,6 +21,7 @@ def successful_step_keys(wf, unsuccessful_step_keys: bool = False):
     """
     all_step_keys = []
     steps = wf.query_step()
+
     # For reused steps whose startedAt are identical, sort them by key
     steps.sort(key=lambda x: "%s-%s" % (x.startedAt, x.key))
     for step in steps:
@@ -78,16 +79,7 @@ def sort_slice_ops(
         keys = _sort_slice_ops(keys, ii)
     return keys
 
-def get_resubmit_keys(wf, unsuccessful_step_keys: bool = False):
-    """[From DPGEN2] Get the keys of all steps in the workflow for resubmission.
-    """
-    all_step_keys = successful_step_keys(wf, unsuccessful_step_keys)
 
-    all_step_keys = sort_slice_ops(
-        all_step_keys,
-        ["run-vasp","ion-md"],
-    )
-    return all_step_keys
 
 
 def print_steps(step_keys: List[str]) -> None:

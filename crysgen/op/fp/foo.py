@@ -15,7 +15,7 @@ from typing import (
     Union,
 )
 
-import numpy as np
+import random
 from dargs import (
     Argument,
     dargs,
@@ -122,7 +122,7 @@ class RunFoo(RunFp):
         out_name = out
         atoms= read(foo_conf_name,index=0)
         energy = 1
-        forces = np.random.rand(len(atoms),3)
+        forces = [[random.random() for _ in range(3)] for _ in range(len(atoms))]
         # delete calculator fields
         atoms.calc.results.clear()
         atoms.info['energy'] = energy

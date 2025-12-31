@@ -6,22 +6,75 @@ import json
 import sys
 from pathlib import Path
 from typing import List, Optional
-import dpdata
-
-import ase
-import dflow
 from dflow import Workflow, Step
 import logging
-
-import crysgen
+import re
 from crysgen.entrypoint.common import global_config_workflow
 from crysgen.flow.solid_electrolyte.loop import SolidElectrolyteGenScreen
 from crysgen.superop.train_generate.mattergen import MatterGen
 from crysgen.superop.evaluate.solid_electrolyte import SolidElectrolyteMatterGen
 from crysgen.op.fp.vasp_input import VaspInputs
-from crysgen.utils.workflow_query import get_resubmit_keys, print_steps, parse_index_string, get_steps_by_indices, get_steps_by_indices
+from crysgen.utils.workflow_query import print_steps, parse_index_string, get_steps_by_indices, get_steps_by_indices, sort_slice_ops, successful_step_keys
 from crysgen.utils.artifacts import upload_artifact_and_print_uri, get_artifact_from_uri
 from crysgen.utils.download_artifacts import download_step_artifacts
+
+def get_superop(key):
+    """[From DPGEN2] Get the super operation key for a given step key.
+
+    Args:
+        key (str): The step key.
+
+    Returns:
+        str: The super operation key, or None if not found.
+    """
+    if "prep-vasp" in key:
+        return key.replace("prep-vasp", "prep-run-vasp")
+    elif "run-vasp-" in key:
+        return re.sub("run-vasp-[0-9]*", "prep-run-vasp", key)
+    return None
+
+def fold_keys(all_step_keys):
+    """[From DPGEN2] Fold step keys by their super operation.
+    
+    Args:
+        all_step_keys (List[str]): List of all step keys.
+    Returns:
+        dict: A dictionary mapping super operation keys to their folded step keys, e.g., {"prep-run-vasp":["run-vasp-0000"]}.
+    """
+    folded_keys = {}
+    for key in all_step_keys:
+        is_superop = False
+        for superop in [ "prep-run-vasp"]:
+            if superop in key:
+                if key not in folded_keys:
+                    folded_keys[key] = []
+                is_superop = True
+                break
+        if is_superop:
+            continue
+        superop = get_superop(key)
+        # if its super OP is succeeded, fold it into its super OP
+        if superop is not None and superop in all_step_keys:
+            if superop not in folded_keys:
+                folded_keys[superop] = []
+            folded_keys[superop].append(key)
+        else:
+            folded_keys[key] = [key]
+    for k, v in folded_keys.items():
+        if v == []:
+            folded_keys[k] = [k]
+    return folded_keys
+
+def get_resubmit_keys(wf, unsuccessful_step_keys: bool = False):
+    """[From DPGEN2] Get the keys of all steps in the workflow for resubmission.
+    """
+    all_step_keys = successful_step_keys(wf, unsuccessful_step_keys)
+    all_step_keys = sort_slice_ops(
+        all_step_keys,
+        ["run-vasp","ion-md"],
+    )
+    
+    return all_step_keys
 
 def load_config(config_path: Path) -> dict:
     """Load configuration from JSON file."""
@@ -247,13 +300,14 @@ def resubmit_workflow(args):
     # Get old workflow
     wf_old = Workflow(id=args.workflow_id)
     
+    print(args.reuse_all_steps)
     # Get all reusable steps
     all_step_keys = get_resubmit_keys(
         wf_old,
         unsuccessful_step_keys=args.reuse_all_steps
     )
     
-    print(f"Found {len(all_step_keys)} reusable steps from workflow {args.workflow_id}")
+    folded_keys = fold_keys(all_step_keys)
     
     # If list_steps flag is set, print steps and exit
     if args.list_steps:
@@ -268,6 +322,22 @@ def resubmit_workflow(args):
     else:
         step_keys = all_step_keys
         print(f"Reusing all {len(step_keys)} steps")
+    
+    if args.fold:
+        reused_folded_keys = {}
+        for key in step_keys:
+            superop = get_superop(key)
+            if superop is not None:
+                if superop not in reused_folded_keys:
+                    reused_folded_keys[superop] = []
+                reused_folded_keys[superop].append(key)
+            else:
+                reused_folded_keys[key] = [key]
+        for k, v in reused_folded_keys.items():
+            # reuse the super OP iif all steps within it are reused
+            if v != [k] and k in folded_keys and set(v) == set(folded_keys[k]):
+                reused_folded_keys[k] = [k]
+        step_keys = sum(reused_folded_keys.values(), [])
     
     if args.verbose:
         print("\nSteps to reuse:")
@@ -440,6 +510,11 @@ Examples:
         '-l', '--list-steps',
         action='store_true',
         help='List available steps and exit without submitting'
+    )
+    resubmit_parser.add_argument(
+        '-f','--fold',
+        action='store_true',
+        help='Fold step keys by super operation when reusing steps'
     )
     resubmit_parser.add_argument(
         '--reuse-all-steps',
