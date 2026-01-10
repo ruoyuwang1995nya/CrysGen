@@ -51,6 +51,7 @@ class RelaxFF(OP):
         task_name = ip["task_name"]
         work_dir = Path(task_name)
         relaxer=config.pop("relaxer")
+        config.pop("batch_size",None)
         with set_directory(work_dir):
             try:
                 relaxed_structure, energies, extra_outputs = Tools.get(relaxer)(

@@ -22,7 +22,8 @@ from dflow.python import (
     Slices,
     OP,
     Artifact,
-    Parameter
+    Parameter,
+    BigParameter
 )
 from crysgen.utils.step_config import init_executor
 from crysgen.op.relax import RelaxFF
@@ -49,21 +50,25 @@ def _pop_executor(config: Dict):
 @OP.function
 def StructureDistributor(
     prefix: str,
-    structures: Artifact(Path),   
+    structures: Artifact(Path),
+    config: dict,
 ) -> {"structures_ls": Artifact(List[Path]), "idx_ls": Parameter(List[str])}:
-    """Distribute structures into a list of single-structure files.
+    """Distribute structures into a list of structure files.
 
     Args:
+        prefix (str): Prefix for naming output files.
         structures (Artifact(Path)): Path to the input structures file.
+        num_frames (int): Number of structures to include in each output file. Default is 1.
 
     Returns:
-        structures_ls (Artifact(List[Path])): List of paths to single-structure files.
-        idx_ls (Parameter(List[int])): List of indices corresponding to the structures.
+        structures_ls (Artifact(List[Path])): List of paths to structure files.
+        idx_ls (Parameter(List[str])): List of indices corresponding to the structure files.
     """
     from ase.io import read, write
     from pathlib import Path
     import os
-
+    
+    num_frames = config.get("batch_size", 1)
     atoms_list = read(structures, index=":")
     structures_ls = []
     idx_ls = []
@@ -71,16 +76,71 @@ def StructureDistributor(
     output_dir = Path("distributed_structures")
     os.makedirs(output_dir, exist_ok=True)
 
-    for idx, atoms in enumerate(atoms_list):
-        structure_path = output_dir / f"structure_{idx:06d}.xyz"
-        write(structure_path, atoms)
+    # Group structures into chunks of num_frames
+    for chunk_idx in range(0, len(atoms_list), num_frames):
+        chunk = atoms_list[chunk_idx:chunk_idx + num_frames]
+        structure_path = output_dir / f"structure_{chunk_idx:06d}.xyz"
+        write(structure_path, chunk)
         structures_ls.append(structure_path)
-        idx_ls.append(f"{prefix}_{idx:06d}")
+        idx_ls.append(f"{prefix}_{chunk_idx:06d}")
+    
+    print(idx_ls)
 
     return {
         "structures_ls": structures_ls,
         "idx_ls": idx_ls,
     }
+
+@OP.function
+def StructureCollector(
+    structure_files: Artifact(List[Path]),
+    energy_files: Artifact(List[Path])
+) -> {"structures": Artifact(Path), "energies": Artifact(Path)}:
+    """Collect and merge multiple structure and energy files.
+
+    Args:
+        structure_files (Artifact(List[Path])): List of structure file paths from multiple relax steps.
+        energy_files (Artifact(List[Path])): List of energy file paths from multiple relax steps.
+
+    Returns:
+        structures (Artifact(Path)): Merged structure file containing all relaxed structures.
+        energies (Artifact(Path)): Merged energies file containing all corresponding energies.
+    """
+    from ase.io import read, write
+    from pathlib import Path
+    import numpy as np
+
+    # Collect all structures
+    all_structures = []
+    for structure_file in structure_files:
+        atoms_list = read(structure_file, index=":")
+        if isinstance(atoms_list, list):
+            all_structures.extend(atoms_list)
+        else:
+            all_structures.append(atoms_list)
+
+    # Write merged structures
+    merged_structures = Path("merged_structures.extxyz")
+    write(merged_structures, all_structures)
+
+    # Collect all energies
+    all_energies = []
+    for energy_file in energy_files:
+        energies = np.load(energy_file)
+        if energies.ndim == 0:
+            all_energies.append(float(energies))
+        else:
+            all_energies.extend(energies.tolist())
+
+    # Write merged energies
+    merged_energies = Path("merged_energies.npy")
+    np.save(merged_energies, np.array(all_energies))
+
+    return {
+        "structures": merged_structures,
+        "energies": merged_energies,
+    }
+
 
 class SolidElectrolyteMatterGen(Steps):
     """
@@ -114,10 +174,10 @@ class SolidElectrolyteMatterGen(Steps):
             "model": InputArtifact(optional=True),
         }
         self._output_parameters = {
-            "results": OutputParameter(), # BigParameter(dict), all evaluation results
         }
         self._output_artifacts = {
             "structures": OutputArtifact(optional=True),
+            "results": OutputArtifact(optional=True),
         }
 
         super().__init__(
@@ -165,27 +225,76 @@ class SolidElectrolyteMatterGen(Steps):
         )
         steps.add(pre_screen)
         
+        distribute_structures_relax = Step(
+            "distribute-structures-relax",
+            template= PythonOPTemplate(
+                StructureDistributor,
+                **misc_template_config,
+                python_packages=upload_python_packages,
+                
+            ),
+            parameters={
+                "prefix":"ff_relax",
+                "config": steps.inputs.parameters["config"]["relax_ff"]                
+                },
+            artifacts={"structures": pre_screen.outputs.artifacts["selected_structures"]},
+            key="--".join(["%s"%steps.inputs.parameters["name"], "distribute-relax-structures"]),
+            executor=misc_executor,
+            **misc_config
+        )
+        steps.add(distribute_structures_relax)
+        
+        
         # Coarse relaxation
         relax = Step(
             "ff-relaxation",
             template= PythonOPTemplate(
                 RelaxFF,
+                slices=Slices(
+                    '{{item}}',
+                    input_parameter=["task_name"],
+                    input_artifact=["structures"],
+                    output_artifact=["relaxed_structures", "energies"],
+                    group_size=1,
+                    pool_size=1
+                ),
                 python_packages=upload_python_packages,
                 **ff_template_config,
             ),
             parameters={
-                "task_name": "relax_ff",
+                "task_name": distribute_structures_relax.outputs.parameters["idx_ls"],
                 "config": steps.inputs.parameters["config"]["relax_ff"]
                 },
             artifacts={
-                "structures":pre_screen.outputs.artifacts["selected_structures"],
+                "structures":distribute_structures_relax.outputs.artifacts["structures_ls"],
                 "model": steps.inputs.artifacts["model"],
                 },
-            key="--".join(["%s"%steps.inputs.parameters["name"], "ff-relaxation"]),
+            key="--".join(["%s"%steps.inputs.parameters["name"], "ff-relax","{{item}}"]),
+            with_sequence=argo_sequence(argo_len(distribute_structures_relax.outputs.parameters["idx_ls"])),
             executor=ff_executor,
             **ff_config
         )
         steps.add(relax)
+        
+        
+        collect_relax = Step(
+            "collect-relaxation",
+            template= PythonOPTemplate(
+                StructureCollector,
+                python_packages=upload_python_packages,
+                **misc_template_config,
+            ),
+            parameters={},
+            artifacts={
+                "structure_files": relax.outputs.artifacts["relaxed_structures"],
+                "energy_files": relax.outputs.artifacts["energies"],
+                },
+            key="--".join(["%s"%steps.inputs.parameters["name"], "collect-relaxation"]),
+            executor=misc_executor,
+            **misc_config
+        )
+        steps.add(collect_relax)
+        
         
         ## Inital S.U.N sampling
         sun_eval_ff = Step(
@@ -193,20 +302,20 @@ class SolidElectrolyteMatterGen(Steps):
             template= PythonOPTemplate(
                 SUNEvaluate,
                 python_packages=upload_python_packages,
-                **ff_template_config,
+                **sun_eval_template_config,
             ),
             parameters={
                 "config": steps.inputs.parameters["config"]["sun_eval"],
                 "task_name": "sun_eval"
                 },
             artifacts={
-                "structures":relax.outputs.artifacts["relaxed_structures"],
+                "structures":collect_relax.outputs.artifacts["structures"],
                 "reference_dataset": steps.inputs.artifacts["reference_dataset"],
-                "energies": relax.outputs.artifacts["energies"],
+                "energies": collect_relax.outputs.artifacts["energies"],
                 },
             key="--".join(["%s"%steps.inputs.parameters["name"], "sun-eval-ff"]),
-            executor=ff_executor,
-            **ff_config
+            executor=sun_eval_executor,
+            **sun_eval_config
         )
         steps.add(sun_eval_ff)
         
@@ -311,7 +420,7 @@ class SolidElectrolyteMatterGen(Steps):
                 python_packages=upload_python_packages,
                 
             ),
-            parameters={"prefix":"ion_md"},
+            parameters={"prefix":"ion_md","config":{}},
             artifacts={"structures": sun_eval_vasp.outputs.artifacts["selected_structures"]},
             key="--".join(["%s"%steps.inputs.parameters["name"], "distribute-structures"]),
             executor=misc_executor,
@@ -358,11 +467,11 @@ class SolidElectrolyteMatterGen(Steps):
                 **misc_template_config,
             ),
             parameters={
-                "results": run_md.outputs.parameters["results"],
+                #"results": run_md.outputs.parameters["results"],
                 "config": steps.inputs.parameters["config"]["ion_eval"],
                 },
             artifacts={
-                #"results": run_md.outputs.artifacts["results"],
+                "results": run_md.outputs.artifacts["results"],
                 "structures": distribute_structures.outputs.artifacts["structures_ls"],
                 },
             key="--".join(["%s"%steps.inputs.parameters["name"], "select-ion-md"]),
@@ -372,5 +481,5 @@ class SolidElectrolyteMatterGen(Steps):
         steps.add(select_ion_md)
         
         steps.outputs.artifacts["structures"]._from = select_ion_md.outputs.artifacts["selected_structures"]
-        steps.outputs.parameters["results"].value_from_parameter = select_ion_md.outputs.parameters["selected_results"]
+        steps.outputs.artifacts["results"]._from = select_ion_md.outputs.artifacts["selected_results"]
         return steps
