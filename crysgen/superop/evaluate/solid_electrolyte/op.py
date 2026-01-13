@@ -129,8 +129,6 @@ class IonMD(OP):
         return OPIOSign(
             {
                 "traj": Artifact(Path),
-                #"results": Parameter(Dict),
-                "structure": Artifact(Path),
                 "results": Artifact(Path),
             },
         )
@@ -184,14 +182,15 @@ class IonMD(OP):
                     log_dir=log_dir,
                     traj_dir=traj_dir,
                 )
-                with open("md_results.json", "w") as f:
+                results_path = Path("md_results.json").resolve()
+                with open(results_path, "w") as f:
                     json.dump(res["analysis"], f, indent=4)
             except Exception as e:
                 raise TransientError(f"MD simulation failed: {e}")
 
         return OPIO({
             "traj": res["last_traj"],
-            "results": Path(task_name)/"md_results.json"})
+            "results": results_path})
     
 class SelectFrameIonMD(OP):
     def __init__(self):
@@ -212,7 +211,7 @@ class SelectFrameIonMD(OP):
         return OPIOSign(
             {
                 "selected_structures": Artifact(Path),
-                "selected_results": Artifact(List[Path])
+                "selected_results": Artifact(Path)
             },
         )
         
@@ -247,11 +246,11 @@ class SelectFrameIonMD(OP):
                         write(name, atoms)
                         selected_results[f"{idx:06d}"] = res_tmp
                         selected_structures.append(Path(name))
-                        logging.INFO(f"Task {idx} {composition} has Li+ diffusion coefficient: {res['Li']:.2e} cm²/s")
+                        logging.info(f"Task {idx} {composition} has Li+ diffusion coefficient: {res['Li']:.2e} cm²/s")
             except Exception as e:
-                logging.WARNING(f"Failed to process structure {structure}!: {e}")
+                logging.warning(f"Failed to process structure {structure}!: {e}")
                 continue
-        logging.INFO(f"Selected {len(selected_structures)} structures based on ion diffusion criteria.")
+        logging.info(f"Selected {len(selected_structures)} structures based on ion diffusion criteria.")
         with open("selected_results.json", "w") as f:
             json.dump(selected_results, f, indent=4)
         return OPIO({

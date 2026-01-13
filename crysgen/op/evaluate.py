@@ -52,6 +52,7 @@ class SUNEvaluate(OP):
                 "selected_structures": Artifact(Path),  
                 "selected_structures_properties": Artifact(Path),
                 "results": BigParameter(dict),
+                "energy_above_hull": Artifact(Path, optional=True),
                 #"reference_dataset": Artifact(Path),
             },
         )
@@ -103,6 +104,14 @@ class SUNEvaluate(OP):
                 metrics=metrics,
                 calc_pre_aggregate=config.get("calc_pre_aggregate",True)
             )
+            
+            # Access energy_above_hull directly from energy_capability if available
+            energy_above_hull_values = None
+            if hasattr(evaluator, 'energy_capability'):
+                energy_above_hull_values = evaluator.energy_capability.energy_above_hull
+                print(f"Energy above hull values: {energy_above_hull_values}")
+                np.save("energy_above_hull.npy", energy_above_hull_values)
+            
             # select structures
             selection_metrics = config.get("selection_criteria", [])
             default_mask = np.array([True] * len(structure_summaries))
@@ -145,10 +154,16 @@ class SUNEvaluate(OP):
             else:
                 reference_dataset = ip["reference_dataset"]
             
+            # Prepare energy_above_hull output
+            energy_above_hull_path = None
+            if energy_above_hull_values is not None:
+                energy_above_hull_path = work_dir / "energy_above_hull.npy"
+            
         return OPIO({
             "selected_structures": work_dir / "selected_structures.extxyz",
             "selected_structures_properties": {k: work_dir / v for k, v in selected_properties.items()},
             "results": metric_results,
+            "energy_above_hull": energy_above_hull_path,
             #"reference_dataset": reference_dataset,
         })
         
