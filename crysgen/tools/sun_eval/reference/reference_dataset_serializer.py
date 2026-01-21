@@ -18,8 +18,8 @@ from pymatgen.core import Composition
 from pymatgen.entries.computed_entries import ComputedStructureEntry
 from tqdm.autonotebook import tqdm
 
-from crysgen.evaluation.reference.reference_dataset import ReferenceDataset, ReferenceDatasetImpl
-from crysgen.evaluation.utils.lmdb_utils import lmdb_get, lmdb_open, lmdb_put, lmdb_read_metadata
+from .reference_dataset import ReferenceDataset, ReferenceDatasetImpl
+from ..utils.lmdb_utils import lmdb_get, lmdb_open, lmdb_put, lmdb_read_metadata
 
 
 def gzip_compress(file_path: str | os.PathLike, output_dir: str | os.PathLike) -> Path:

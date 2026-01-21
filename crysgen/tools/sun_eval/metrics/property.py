@@ -8,11 +8,11 @@ import numpy as np
 import numpy.typing
 from pandas import DataFrame
 
-from crysgen.evaluation.metrics.core import BaseAggregateMetric, BaseMetric, BaseMetricsCapability
-from crysgen.evaluation.metrics.energy import EnergyMetricsCapability
-from crysgen.evaluation.metrics.structure import StructureMetricsCapability
-from crysgen.evaluation.utils.metrics_structure_summary import MetricsStructureSummary
-from crysgen.evaluation.utils.utils import PropertyConstraint, DiscretePropertyConstraint
+from .core import BaseAggregateMetric, BaseMetric, BaseMetricsCapability
+from .energy import EnergyMetricsCapability
+from .structure import StructureMetricsCapability
+from ..utils.metrics_structure_summary import MetricsStructureSummary
+from ..utils.utils import PropertyConstraint, DiscretePropertyConstraint
 
 
 class PropertyMetricsCapability(BaseMetricsCapability):

@@ -12,8 +12,8 @@ from pymatgen.core.lattice import Lattice
 from pymatgen.entries.computed_entries import ComputedStructureEntry
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
-from crysgen.evaluation.utils.globals import MAX_RMSD
-from crysgen.evaluation.utils.structure_matcher import RMSDStructureMatcher
+from .globals import MAX_RMSD
+from .structure_matcher import RMSDStructureMatcher
 
 OptionalNumber = int | float | None
 PropertyConstraint = tuple[

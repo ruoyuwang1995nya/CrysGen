@@ -12,7 +12,7 @@ from pymatgen.analysis.structure_matcher import (
 from pymatgen.core.periodic_table import Element
 from pymatgen.core.structure import Structure
 
-from crysgen.evaluation.utils.globals import MAX_RMSD
+from .globals import MAX_RMSD
 
 
 class RMSDStructureMatcher(StructureMatcher):

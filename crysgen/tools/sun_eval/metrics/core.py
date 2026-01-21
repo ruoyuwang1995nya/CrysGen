@@ -10,8 +10,8 @@ import numpy as np
 import numpy.typing
 from pandas import DataFrame
 
-from crysgen.evaluation.reference.reference_dataset import ReferenceDataset
-from crysgen.evaluation.utils.metrics_structure_summary import MetricsStructureSummary
+from ..reference.reference_dataset import ReferenceDataset
+from ..utils.metrics_structure_summary import MetricsStructureSummary
 
 
 class BaseMetricsCapability:

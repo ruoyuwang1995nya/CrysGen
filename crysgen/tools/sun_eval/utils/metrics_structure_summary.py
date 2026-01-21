@@ -10,8 +10,8 @@ from pymatgen.core import Structure
 from pymatgen.entries.compatibility import Compatibility, MaterialsProject2020Compatibility
 from pymatgen.entries.computed_entries import ComputedStructureEntry
 
-from crysgen.evaluation.utils.utils import compute_rmsd_angstrom, preprocess_structure
-from crysgen.evaluation.utils.vasprunlike import VasprunLike
+from .utils import compute_rmsd_angstrom, preprocess_structure
+from .vasprunlike import VasprunLike
 
 
 @dataclass

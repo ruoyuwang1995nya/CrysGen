@@ -196,7 +196,9 @@ def build_workflow(config: dict) -> Workflow:
     """
     # Setup Python packages
     module_names = config.get("upload_python_packages", [])
+    
     upload_python_packages = setup_python_packages(module_names)
+    print(upload_python_packages)
     
     # Build step configs
     (default_step_config, train_step_config,  vasp_step_config, ion_md_step_config,sun_eval_step_config,

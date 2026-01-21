@@ -234,7 +234,6 @@ class SelectFrameIonMD(OP):
                 with open(res_path, "r") as f:
                     res = json.load(f)
                 if res["diff"].get("Li"):
-                    print(res["diff"]["Li"])
                     if res["diff"]["Li"][0]*scale > upper and all(res["diff"][ele][0]*scale < lower for ele in res["diff"] if ele != "Li"):
                         res_tmp=copy(res)
                         atoms=read(structure)

@@ -17,27 +17,27 @@ from pymatgen.core.structure import Structure
 from pymatgen.entries.compatibility import Compatibility, MaterialsProject2020Compatibility
 from typing_extensions import Self
 
-import crysgen.evaluation.metrics.energy as energy_metrics
-import crysgen.evaluation.metrics.property as property_metrics
-import crysgen.evaluation.metrics.structure as structure_metrics
-from crysgen.evaluation.metrics.core import BaseAggregateMetric, BaseMetric, BaseMetricsCapability
-from crysgen.evaluation.metrics.energy import EnergyMetricsCapability, MissingTerminalsError
-from crysgen.evaluation.metrics.property import PropertyMetricsCapability
-from crysgen.evaluation.metrics.structure import StructureMetricsCapability
-from crysgen.evaluation.reference.presets import ReferenceMP2020Correction
-from crysgen.evaluation.reference.reference_dataset import ReferenceDataset
-from crysgen.evaluation.utils.globals import DEFAULT_STABILITY_THRESHOLD
-from crysgen.evaluation.utils.logging import logger
-from crysgen.evaluation.utils.metrics_structure_summary import (
+from ..metrics import energy as energy_metrics
+from ..metrics import property as property_metrics
+from ..metrics import structure as structure_metrics
+from .core import BaseAggregateMetric, BaseMetric, BaseMetricsCapability
+from .energy import EnergyMetricsCapability, MissingTerminalsError
+from .property import PropertyMetricsCapability
+from .structure import StructureMetricsCapability
+from ..reference.presets import ReferenceMP2020Correction
+from ..reference.reference_dataset import ReferenceDataset
+from ..utils.globals import DEFAULT_STABILITY_THRESHOLD
+from ..utils.logging import logger
+from ..utils.metrics_structure_summary import (
     MetricsStructureSummary,
     get_metrics_structure_summaries,
 )
-from crysgen.evaluation.utils.structure_matcher import (
+from ..utils.structure_matcher import (
     DefaultDisorderedStructureMatcher,
     DisorderedStructureMatcher,
     OrderedStructureMatcher,
 )
-from crysgen.evaluation.utils.utils import PropertyConstraint
+from ..utils.utils import PropertyConstraint
 
 T = TypeVar("T")
 

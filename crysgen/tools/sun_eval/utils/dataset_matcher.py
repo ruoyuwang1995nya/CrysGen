@@ -10,9 +10,9 @@ from pymatgen.core.structure import Structure
 from pymatgen.entries.computed_entries import ComputedStructureEntry
 from tqdm import tqdm
 
-from crysgen.evaluation.reference.reference_dataset import ReferenceDataset
-from crysgen.evaluation.utils.logging import logger
-from crysgen.evaluation.utils.structure_matcher import (
+from ..reference.reference_dataset import ReferenceDataset
+from .logging import logger
+from .structure_matcher import (
     DefaultDisorderedStructureMatcher,
     DisorderedStructureMatcher,
     OrderedStructureMatcher,

@@ -175,6 +175,8 @@ class SolidElectrolyteGenScreen(Steps):
             parameters={
                 "iter_id": steps.inputs.parameters["iter_id"],
                 "config": steps.inputs.parameters["scheduler_config"],
+                "iter_num": steps.inputs.parameters["iter_num"]
+                
             },
             artifacts={
                 "iter_data": steps.inputs.artifacts["training_data"],
@@ -210,19 +212,19 @@ class SolidElectrolyteGenScreen(Steps):
             template=steps,
             parameters=next_parameters,
             artifacts=next_artifacts,
-            when="%s >= %s" % (scheduler.outputs.parameters["iter_id"], steps.inputs.parameters["iter_num"]),
+            when="%s == false" % (scheduler.outputs.parameters["stop"]),
             key="--".join(
                 ["iter-%s"%scheduler.outputs.parameters["iter_id"], "gen-screen-loop"]
             )
         )
         steps.add(next_step)
         steps.outputs.artifacts["generated_structures"].from_expression = if_expression(
-            _if=(scheduler.outputs.parameters["iter_id"]>=steps.inputs.parameters["iter_num"]),
+            _if=scheduler.outputs.parameters["stop"],
             _then=screening.outputs.artifacts["structures"],
             _else=next_step.outputs.artifacts["generated_structures"],
         )
         steps.outputs.artifacts["model"].from_expression = if_expression(
-            _if=(scheduler.outputs.parameters["iter_id"]>=steps.inputs.parameters["iter_num"]),
+            _if=scheduler.outputs.parameters["stop"],
             _then=train_generator.outputs.artifacts["model"],
             _else=next_step.outputs.artifacts["model"],
         )

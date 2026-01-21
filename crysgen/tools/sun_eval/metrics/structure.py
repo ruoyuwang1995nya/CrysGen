@@ -20,21 +20,21 @@ from scipy.stats import wasserstein_distance
 from smact.screening import pauling_test
 from tqdm import tqdm
 
-from crysgen.evaluation.metrics.core import BaseAggregateMetric, BaseMetric, BaseMetricsCapability
-from crysgen.evaluation.reference.reference_dataset import ReferenceDataset
-from crysgen.evaluation.utils.dataset_matcher import (
+from .core import BaseAggregateMetric, BaseMetric, BaseMetricsCapability
+from ..reference.reference_dataset import ReferenceDataset
+from ..utils.dataset_matcher import (
     DisorderedDatasetUniquenessComputer,
     OrderedDatasetUniquenessComputer,
     get_dataset_matcher,
     matches_to_mask,
 )
-from crysgen.evaluation.utils.logging import logger
-from crysgen.evaluation.utils.metrics_structure_summary import MetricsStructureSummary
-from crysgen.evaluation.utils.structure_matcher import (
+from ..utils.logging import logger
+from ..utils.metrics_structure_summary import MetricsStructureSummary
+from ..utils.structure_matcher import (
     DisorderedStructureMatcher,
     OrderedStructureMatcher,
 )
-from crysgen.evaluation.utils.symmetry_analysis import (
+from ..utils.symmetry_analysis import (
     DefaultSpaceGroupAnalyzer,
     DisorderedSpaceGroupAnalyzer,
 )

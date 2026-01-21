@@ -4,7 +4,7 @@
 from pymatgen.core.structure import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
-from crysgen.evaluation.utils.structure_matcher import try_make_structure_disordered
+from .structure_matcher import try_make_structure_disordered
 
 
 class DefaultSpaceGroupAnalyzer(SpacegroupAnalyzer):

@@ -11,13 +11,13 @@ from pandas import DataFrame
 from pymatgen.analysis.phase_diagram import PhaseDiagram
 from tqdm import tqdm
 
-from crysgen.evaluation.metrics.core import BaseAggregateMetric, BaseMetric, BaseMetricsCapability
-from crysgen.evaluation.metrics.structure import StructureMetricsCapability
-from crysgen.evaluation.reference.reference_dataset import ReferenceDataset
-from crysgen.evaluation.utils.globals import DEFAULT_STABILITY_THRESHOLD
-from crysgen.evaluation.utils.logging import logger
-from crysgen.evaluation.utils.metrics_structure_summary import MetricsStructureSummary
-from crysgen.evaluation.utils.utils import expand_into_subsystems
+from .core import BaseAggregateMetric, BaseMetric, BaseMetricsCapability
+from .structure import StructureMetricsCapability
+from ..reference.reference_dataset import ReferenceDataset
+from ..utils.globals import DEFAULT_STABILITY_THRESHOLD
+from ..utils.logging import logger
+from ..utils.metrics_structure_summary import MetricsStructureSummary
+from ..utils.utils import expand_into_subsystems
 
 # -----------------------------#
 # Capabilities

@@ -11,7 +11,7 @@ from crysgen.evaluation.utils.symmetry_analysis import (
     DefaultSpaceGroupAnalyzer,
     DisorderedSpaceGroupAnalyzer,
 )
-from crysgen.evaluation.utils.utils import generate_chemsys_dict, generate_reduced_formula_dict
+from ..utils.utils import generate_chemsys_dict, generate_reduced_formula_dict
 
 
 class ReferenceDataset(Iterable[ComputedStructureEntry]):
