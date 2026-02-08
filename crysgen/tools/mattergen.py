@@ -68,7 +68,7 @@ def mattergen_data(
     properties_data = {prop: {'values':[],'property_source_doc_id':prop,'origins':None} for prop in properties}
     for idx, atoms in enumerate(atoms_ls):
         cells.append(atoms.get_cell().array)
-        positions.append(atoms.get_positions())
+        positions.append(atoms.get_scaled_positions())  # Use fractional coordinates
         num_atoms.append(len(atoms))
         atomic_numbers.append(atoms.get_atomic_numbers())
         if atoms.info.get("structure_id") is not None:
@@ -168,13 +168,13 @@ def mattergen2ase(
         
         # Extract data for this structure
         cell = cells[i]
-        pos = positions[atom_offset:atom_offset + n_atoms]
+        pos_frac = positions[atom_offset:atom_offset + n_atoms]
         nums = atomic_numbers[atom_offset:atom_offset + n_atoms]
         
-        # Create Atoms object
+        # Create Atoms object with fractional coordinates
         atoms = Atoms(
             numbers=nums,
-            positions=pos,
+            scaled_positions=pos_frac,  # Use fractional coordinates
             cell=cell,
             pbc=True
         )
