@@ -465,6 +465,9 @@ class MDRunner:
         traj_slice = traj[start_frame:]
         timestep_internal = timestep_fs * units.fs * dump_interval
         diff_coeff_analyzer = DiffusionCoefficient(traj_slice, timestep=timestep_internal)
+        
+        
+        #diff_coeff_analyzer.plot()
         base_frame = traj[start_frame]
         volume_m3 = base_frame.get_volume() * 1e-30
         if volume_m3 <= 0:

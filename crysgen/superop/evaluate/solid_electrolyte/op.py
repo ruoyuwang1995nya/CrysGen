@@ -150,12 +150,14 @@ class IonMD(OP):
         
         # Create supercell if specified in config
         supercell = config.get("supercell", None)
+        print(supercell)
         if supercell:
             from ase.build import make_supercell
             if isinstance(supercell, list) and len(supercell) == 3:
                 # Simple [nx, ny, nz] format
                 atoms = atoms * supercell
                 logging.info(f"Created supercell {supercell}, new cell has {len(atoms)} atoms")
+                print(f"Created supercell {supercell}, new cell has {len(atoms)} atoms")
             elif isinstance(supercell, list) and len(supercell) == 9:
                 # 3x3 transformation matrix (flattened)
                 matrix = np.array(supercell).reshape(3, 3)
@@ -170,6 +172,7 @@ class IonMD(OP):
             calc = CalculatorWrapper.get_calculator(calc_style)
             calc = calc().create(model_path=str(model), **calc_cfg)
 
+            print(len(atoms))
             runner = MDRunner.from_atoms(atoms)
             runner.calc = calc
         
@@ -225,27 +228,52 @@ class SelectFrameIonMD(OP):
         results: List[Path] = ip["results"]
         selected_structures = []
         selected_results = {}
-        upper=config.get("li_above", 1e-6) # to cm^2/s
-        lower=config.get("other_below", 1e-7)
-        scale = 1 # to cm^2/s
+        li_threshold = config.get("li_above", 1e-6)  # Li diffusion threshold in cm^2/s
+        other_floor = config.get("other_floor", 1e-7)
+        other_divisor = config.get("other_divisor", 100)  # threshold_other = max(other_floor, li_diff/other_divisor)
         
         for idx, (structure, res_path) in enumerate(zip(structures, results)):
             try:
                 with open(res_path, "r") as f:
                     res = json.load(f)
-                if res["diff"].get("Li"):
-                    if res["diff"]["Li"][0]*scale > upper and all(res["diff"][ele][0]*scale < lower for ele in res["diff"] if ele != "Li"):
-                        res_tmp=copy(res)
-                        atoms=read(structure)
-                        composition = atoms[0].get_chemical_formula(mode='hill',empirical=True)
-                        res_tmp.update({
-                            "formula": composition,
-                            "idx": "%06d"%idx})
-                        name = f"selected_{idx:06d}_{composition}.extxyz"
-                        write(name, atoms)
-                        selected_results[f"{idx:06d}"] = res_tmp
-                        selected_structures.append(Path(name))
-                        logging.info(f"Task {idx} {composition} has Li+ diffusion coefficient: {res['Li']:.2e} cm²/s")
+                diff_data = res.get("diff", {})
+                li_diff_entry = diff_data.get("Li")
+                if not li_diff_entry:
+                    continue
+
+                li_diff = li_diff_entry[0]
+                other_diffs = [diff_data[ele][0] for ele in diff_data if ele != "Li" and diff_data.get(ele)]
+
+                if not other_diffs:
+                    continue
+
+                max_other_diff = max(other_diffs)
+                threshold_other = max(other_floor, li_diff / other_divisor)
+
+                if li_diff > li_threshold and max_other_diff < threshold_other:
+                    atoms = read(structure)
+                    composition = atoms.get_chemical_formula(mode='hill', empirical=True)
+                    ratio = li_diff / max_other_diff if max_other_diff > 0 else float("inf")
+
+                    res_tmp = copy(res)
+                    res_tmp.update({
+                        "formula": composition,
+                        "li_diff": li_diff,
+                        "max_other_diff": max_other_diff,
+                        "ratio": ratio,
+                        "threshold_other": threshold_other,
+                        "idx": f"{idx:06d}",
+                    })
+
+                    name = f"selected_{idx:06d}_{composition}.extxyz"
+                    write(name, atoms)
+                    selected_results[f"{idx:06d}"] = res_tmp
+                    selected_structures.append(Path(name))
+                    logging.info(
+                        f"Task {idx} {composition}: Li={li_diff:.2e} cm²/s, "
+                        f"max_other={max_other_diff:.2e} cm²/s, ratio={ratio:.1f}, "
+                        f"threshold={threshold_other:.2e}"
+                    )
             except Exception as e:
                 logging.warning(f"Failed to process structure {structure}!: {e}")
                 continue
