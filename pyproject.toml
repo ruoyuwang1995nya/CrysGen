@@ -10,3 +10,11 @@ authors = [{name = "Ruoyu Wang", email = "ruoyuwang1995@gmail.com"}]
 license = "MIT"
 readme = "README.md"
 requires-python = ">=3.10"
+dependencies = [
+    "pydflow>=1.8.132",
+    "dpdata>=0.2.24",
+    "pymatgen>=2024.6.4",
+    "ase==3.25.0",
+]
+[project.scripts]
+crysgen-solid-electrolyte = "crysgen.entrypoint.se_generate_screen:main"
