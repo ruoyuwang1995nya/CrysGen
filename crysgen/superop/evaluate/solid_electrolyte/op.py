@@ -213,7 +213,7 @@ class SelectFrameIonMD(OP):
     def get_output_sign(cls)-> OPIOSign:
         return OPIOSign(
             {
-                "selected_structures": Artifact(Path),
+                "selected_structures": Artifact(List[Path]),
                 "selected_results": Artifact(Path)
             },
         )
@@ -229,8 +229,8 @@ class SelectFrameIonMD(OP):
         selected_structures = []
         selected_results = {}
         li_threshold = config.get("li_above", 1e-6)  # Li diffusion threshold in cm^2/s
-        other_floor = config.get("other_floor", 1e-7)
-        other_divisor = config.get("other_divisor", 100)  # threshold_other = max(other_floor, li_diff/other_divisor)
+        other_floor = config.get("other_floor", 1e-8)
+        other_divisor = config.get("other_divisor", 1000)  # threshold_other = max(other_floor, li_diff/other_divisor)
         
         for idx, (structure, res_path) in enumerate(zip(structures, results)):
             try:
