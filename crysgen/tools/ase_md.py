@@ -5,18 +5,16 @@ from pathlib import Path
 from typing import Optional, Dict, Any, Union, Sequence, List
 from dataclasses import dataclass, asdict, field
 
-import ase
 import numpy as np
 from ase import Atoms, units
 from ase.io import read
 from ase.io.trajectory import Trajectory
-from ase.md.langevin import Langevin
 from ase.md.nose_hoover_chain import NoseHooverChainNVT
 from ase.md.nptberendsen import NPTBerendsen
 from ase.md.velocitydistribution import MaxwellBoltzmannDistribution
 from ase.md.analysis import DiffusionCoefficient
 from ase.optimize import LBFGS
-from ase.filters import UnitCellFilter, ExpCellFilter
+from ase.filters import UnitCellFilter
 
 from crysgen.constants import ase_log_name, ase_traj_name
 
@@ -353,6 +351,7 @@ class MDRunner:
             dump_interval=last_params.traj_freq,
             charges=charges,
             start_frame=start_frame,
+            plot_file="msd_plot.png"
         )
 
         return {"last_traj": last_traj, "analysis": diff_res}
@@ -428,6 +427,7 @@ class MDRunner:
         dump_interval: int = 1,
         charges: Optional[Dict[str, float]] = None,
         start_frame: int = 0,
+        plot_file: Optional[Union[str, Path]] = None,
     ) -> Dict[str, Any]:
         """Compute diffusion coefficients and ionic conductivities from an ASE trajectory.
 
@@ -446,6 +446,8 @@ class MDRunner:
             for any element not provided.
         start_frame : int
             Frame index to use as the reference for displacements.
+        plot_file : str | Path, optional
+            If provided, save the diffusion plot to this file path.
 
         Returns
         -------
@@ -465,7 +467,15 @@ class MDRunner:
         traj_slice = traj[start_frame:]
         timestep_internal = timestep_fs * units.fs * dump_interval
         diff_coeff_analyzer = DiffusionCoefficient(traj_slice, timestep=timestep_internal)
+        diff_coeffs_raw = diff_coeff_analyzer.get_diffusion_coefficients()
         
+        # Generate and optionally save plot
+        diff_coeff_analyzer.plot(show=False)
+        if plot_file is not None:
+            import matplotlib.pyplot as plt
+            fig = plt.gcf()
+            fig.savefig(plot_file, dpi=300, bbox_inches='tight')
+            plt.close(fig)
         
         #diff_coeff_analyzer.plot()
         base_frame = traj[start_frame]
@@ -477,7 +487,6 @@ class MDRunner:
         diffusion: Dict[str, List[float]] = {}
         conductivity: Dict[str, float] = {}
 
-        diff_coeffs_raw = diff_coeff_analyzer.get_diffusion_coefficients()
         for idx, element in enumerate(diff_coeff_analyzer.types_of_atoms):
             # Convert from ASE internal units to cm²/s
             D_cm2_s = diff_coeffs_raw[0][idx] * units.fs * 0.1

@@ -130,6 +130,7 @@ class IonMD(OP):
             {
                 "traj": Artifact(Path),
                 "results": Artifact(Path),
+                "additional_results":Artifact(List[Path])
             },
         )
         
@@ -172,10 +173,9 @@ class IonMD(OP):
             calc = CalculatorWrapper.get_calculator(calc_style)
             calc = calc().create(model_path=str(model), **calc_cfg)
 
-            print(len(atoms))
             runner = MDRunner.from_atoms(atoms)
             runner.calc = calc
-        
+            additional_results = []
             # start md simulation
             try:
                 log_dir = config.get("log_dir")
@@ -185,6 +185,9 @@ class IonMD(OP):
                     log_dir=log_dir,
                     traj_dir=traj_dir,
                 )
+                plot_path = Path("msd_plot.png").resolve()
+                if plot_path.exists():
+                    additional_results.append(plot_path)
                 results_path = Path("md_results.json").resolve()
                 with open(results_path, "w") as f:
                     json.dump(res["analysis"], f, indent=4)
@@ -193,7 +196,9 @@ class IonMD(OP):
 
         return OPIO({
             "traj": res["last_traj"],
-            "results": results_path})
+            "results": results_path,
+            "additional_results": additional_results
+        })
     
 class SelectFrameIonMD(OP):
     def __init__(self):
