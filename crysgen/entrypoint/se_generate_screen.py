@@ -67,8 +67,30 @@ def fold_keys(all_step_keys):
 
 def get_resubmit_keys(wf, unsuccessful_step_keys: bool = False):
     """[From DPGEN2] Get the keys of all steps in the workflow for resubmission.
+    
+    Args:
+        wf: The workflow object.
+        unsuccessful_step_keys: If True, include unsuccessful steps.
+        allowed_key_names: List of allowed KEYNAMEs to filter (e.g., ["ff-relax", "run-vasp", "prep-vasp"]).
     """
-    all_step_keys = successful_step_keys(wf, unsuccessful_step_keys)
+    allowed_key_names=[
+        "ff-relax",
+        "pre-screening",
+        "prep-vasp",
+        "run-vasp",
+        "distribute-structures",
+        "collect-relaxation",
+        "distribute-relax-structures",
+        "ion-md",
+        "select-ion-md",
+        "sun-eval-ff",
+        "select-vasp",
+        "sun-eval-vasp",
+        "mattergen-train",
+        "mattergen-generate",
+        "mattergen-prepare-data",
+    ]
+    all_step_keys = successful_step_keys(wf, unsuccessful_step_keys, allowed_key_names)
     all_step_keys = sort_slice_ops(
         all_step_keys,
         ["run-vasp","ion-md"],

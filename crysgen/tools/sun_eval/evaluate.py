@@ -113,7 +113,15 @@ def sun_evaluate(
         # write the structure to xyz format
         try:
             selected_structures = [s.entry.structure for s in selected_structure_summaries]
-            write("selected_structures.extxyz", [AseAtomsAdaptor.get_atoms(s) for s in selected_structures])
+            selected_atoms = [AseAtomsAdaptor.get_atoms(s) for s in selected_structures]
+            
+            # Add energy_above_hull to info if available
+            if energy_above_hull_values is not None:
+                selected_energy_above_hull = energy_above_hull_values[mask]
+                for atoms, e_hull in zip(selected_atoms, selected_energy_above_hull):
+                    atoms.info['energy_above_hull'] = float(e_hull)
+            
+            write("selected_structures.extxyz", selected_atoms)
         except Exception as e:
             print(f"Failed to write structure files!: {e}")
             raise RuntimeError("Failed to write structure files!") from e
