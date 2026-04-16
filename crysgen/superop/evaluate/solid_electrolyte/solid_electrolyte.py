@@ -193,6 +193,7 @@ class SolidElectrolyteMatterGen(Steps):
               misc_step_config: Dict[str, Any], 
               sun_eval_step_config: Dict[str, Any],
               ff_step_config: Dict[str, Any],
+              md_step_config: Dict[str, Any],
               dft_step_config: Dict[str, Any],
               upload_python_packages: Optional[List[os.PathLike]] = None,
               **kwargs) -> Steps:
@@ -200,6 +201,8 @@ class SolidElectrolyteMatterGen(Steps):
         ## Initial relaxation with force field
         ff_config, ff_template_config, ff_executor = _pop_executor(ff_step_config)
         ff_template_slice_config = ff_config.pop("template_slice_config", {})
+        md_config, md_template_config, md_executor = _pop_executor(md_step_config)
+        md_template_slice_config = md_config.pop("template_slice_config", {})
         sun_eval_config, sun_eval_template_config, sun_eval_executor = _pop_executor(sun_eval_step_config)
         dft_config, dft_template_config, dft_executor = _pop_executor(dft_step_config)
         dft_template_slice_config = dft_config.pop("template_slice_config", {})
@@ -437,12 +440,11 @@ class SolidElectrolyteMatterGen(Steps):
                     '{{item}}',
                     input_parameter=["task_name"],
                     input_artifact=["structure"],
-                    output_artifact=["traj", "results"],
-                    #output_parameter=["results"],
-                    **ff_template_slice_config,
+                    output_artifact=["traj", "results","additional_results"],
+                    **md_template_slice_config,
                 ),
                 python_packages=upload_python_packages,
-                **ff_template_config,
+                **md_template_config,
                 ),
             parameters={
                 "task_name": distribute_structures.outputs.parameters["idx_ls"],
@@ -454,8 +456,8 @@ class SolidElectrolyteMatterGen(Steps):
             },
             with_sequence=argo_sequence(argo_len(distribute_structures.outputs.parameters["idx_ls"])),
             key="--".join(["%s"%steps.inputs.parameters["name"], "ion-md","{{item}}"]),
-            executor=ff_executor,
-            **ff_config,
+            executor=md_executor,
+            **md_config,
         )        
         steps.add(run_md)
                 

@@ -50,7 +50,7 @@ class TrainGeneration(Steps, ABC):
             "test_data": InputArtifact(optional=True), # path to test data
         }
         self._output_parameters = {
-            "results": OutputParameter(value={}), # BigParameter(dict), all evaluation results
+            #"results": OutputParameter(value={}), # BigParameter(dict), all evaluation results
         }
         self._output_artifacts = {
             "generated_structures": OutputArtifact(optional=True),

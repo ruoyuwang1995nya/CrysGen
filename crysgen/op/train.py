@@ -36,6 +36,7 @@ class Train(OP):
             {
                 "model": Artifact(Path),
                 "report": Artifact(List[Path]),
+                "generation_idx": Parameter(List[str],optional=True)
             },
         )
     @OP.exec_sign_check 
@@ -45,6 +46,7 @@ class Train(OP):
     ) -> OPIO:
         task_name = ip["task_name"]
         config=ip["config"]
+        num_generation_tasks = config.pop("num_generation_tasks", 1)
         base_model=ip["base_model"]
         training_data = ip.get("training_data")
         valid_data = ip.get("valid_data")
@@ -63,6 +65,7 @@ class Train(OP):
         
         return OPIO(
             {
+                "generation_idx": [f"task.{i:03d}" for i in range(num_generation_tasks)],
                 "model": work_dir / model_file,
                 "report": [work_dir / train_script_name,
                            work_dir / log] + [work_dir / x for x in extra_output]

@@ -10,6 +10,7 @@ from typing import Dict, List, Optional, Union
 import logging
 from ase.io import read, write
 from ase import Atoms
+
 import numpy as np
 import json
 
@@ -42,16 +43,21 @@ def mattergen_data(
     ase_extxyz_file: Union[str,Path],
     mattergen_data: Union[str,Path],
     properties: Optional[List[str]] = [],
+    symprec: float = 0.1,
+    angle_tolerance: float = 5.0,
     )->str:
-    """Transform ase.extxyz file to mattergen data format.
+    """Transform structures to MatterGen cache format.
+    Pipeline: ASE -> Pymatgen -> primitive standard cell -> MatterGen .npy layout.
     
     Saves structures as separate .npy files:
     - cell.npy: (N, 3, 3) lattice vectors
     - pos.npy: (total_atoms, 3) concatenated positions
     - num_atoms.npy: (N,) atom counts per structure
     - atomic_numbers.npy: (total_atoms,) concatenated atomic numbers
-    - structure_id.npy: (total_atoms,) structure index for each atom
+    - structure_id.npy: (N,) identifier per structure
     """
+    from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
+    from pymatgen.io.ase import AseAtomsAdaptor
     
     atoms_ls = read(ase_extxyz_file,":")
     if isinstance(mattergen_data,str):
@@ -66,11 +72,19 @@ def mattergen_data(
     atomic_numbers = []
     structure_ids = []
     properties_data = {prop: {'values':[],'property_source_doc_id':prop,'origins':None} for prop in properties}
+    adaptor = AseAtomsAdaptor()
     for idx, atoms in enumerate(atoms_ls):
-        cells.append(atoms.get_cell().array)
-        positions.append(atoms.get_scaled_positions())  # Use fractional coordinates
-        num_atoms.append(len(atoms))
-        atomic_numbers.append(atoms.get_atomic_numbers())
+        # Convert to pymatgen and standardize to primitive cell
+        struct = adaptor.get_structure(atoms)
+        try:
+            sga = SpacegroupAnalyzer(struct, symprec=symprec, angle_tolerance=angle_tolerance)
+            struct = sga.get_primitive_standard_structure()
+        except Exception as exc:  # fallback to raw structure if symmetrization fails
+            logging.warning(f"Symmetrization failed for structure {idx}: {exc}; using original cell")
+        cells.append(struct.lattice.matrix)
+        positions.append(struct.frac_coords)
+        num_atoms.append(len(struct))
+        atomic_numbers.append([site.specie.number for site in struct.sites])
         if atoms.info.get("structure_id") is not None:
             structure_ids.append(atoms.info["structure_id"])
         else:

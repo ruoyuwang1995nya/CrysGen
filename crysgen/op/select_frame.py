@@ -7,7 +7,7 @@ from dflow.python import (
     Parameter
     )
 from pathlib import Path
-from typing import List,Dict
+from typing import List,Dict, Union
 from crysgen.tools import Tools
 import logging
 
@@ -26,7 +26,7 @@ class SelectFrame(OP):
     def get_input_sign(cls)-> OPIOSign:
         return OPIOSign(
             {
-                "structures": Artifact(Path),
+                "structures": Artifact(List[Path]),
                 "config": Parameter(dict)
             },
         )
@@ -51,10 +51,17 @@ class SelectFrame(OP):
         print(config)
         selectors = config.get("selectors", {})
 
-        atoms_ls = read(structures, ":")
+        # Accept a single multi-frame file or a list of files and aggregate all frames
+        atoms_ls: List = []
+        if isinstance(structures, (list, tuple)):
+            for path in structures:
+                atoms_ls.extend(read(path, ":"))
+        else:
+            atoms_ls = read(structures, ":")
 
         masks: List[List[bool]] = []
         for selector_name, selector_cfg in selectors.items():
+            print(f"Applying selector: {selector_name} with config: {selector_cfg}")
             _, mask = Tools.get(selector_name)(atoms_ls, **selector_cfg)
             masks.append(mask)
 
@@ -69,7 +76,7 @@ class SelectFrame(OP):
 
         output_path = Path("selected_structures.extxyz")
         if selected_atoms:
-            logging.info(f"Selected {len(selected_atoms)} structures out of {len(atoms_ls)}")
+            print(f"Selected {len(selected_atoms)} structures out of {len(atoms_ls)}")
             write(output_path, selected_atoms, format="extxyz")
         else:
             # still write an empty file to satisfy downstream expectations

@@ -9,12 +9,19 @@ from typing import List,Optional
 import re
 
 # find successful steps
-def successful_step_keys(wf, unsuccessful_step_keys: bool = False):
+def successful_step_keys(
+    wf, 
+    unsuccessful_step_keys: bool = False,
+    allowed_key_names: Optional[List[str]] = None
+):
     """[From DPGEN2] Get the keys of all successful steps in the workflow.
 
     Args:
         wf (_type_): The workflow object.
         unsuccessful_step_keys (bool, optional): If True, include keys of unsuccessful steps. Defaults to False.
+        allowed_key_names (List[str], optional): List of allowed KEYNAMEs to filter. 
+            Step keys should match pattern "iter-x--{KEYNAME}" or "iter-x--{KEYNAME}--xxxxx".
+            If None, all step keys are included. Defaults to None.
 
     Returns:
         list: A list of successful step keys.
@@ -25,12 +32,28 @@ def successful_step_keys(wf, unsuccessful_step_keys: bool = False):
     # For reused steps whose startedAt are identical, sort them by key
     steps.sort(key=lambda x: "%s-%s" % (x.startedAt, x.key))
     for step in steps:
+        # Check phase condition
         if not unsuccessful_step_keys:
-            if step.key is not None and step.phase == "Succeeded":
-                all_step_keys.append(step.key)
+            if step.key is None or step.phase != "Succeeded":
+                continue
         else:
-            if step.key is not None:
-                all_step_keys.append(step.key)
+            if step.key is None:
+                continue
+        
+        # Filter by allowed key names if specified
+        if allowed_key_names is not None:
+            # Extract KEYNAME from pattern "iter-x--{KEYNAME}" or "iter-x--{KEYNAME}--xxxxx"
+            match = re.match(r"iter-\d+--([^-]+(?:-[^-]+)*?)(?:---?\d+)?$", step.key)
+            if match:
+                key_name = match.group(1)
+                if key_name not in allowed_key_names:
+                    continue
+            else:
+                # If it doesn't match the expected pattern, skip it
+                continue
+        
+        all_step_keys.append(step.key)
+    
     return all_step_keys
 
 def find_slice_ranges(

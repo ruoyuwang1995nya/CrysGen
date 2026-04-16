@@ -67,8 +67,31 @@ def fold_keys(all_step_keys):
 
 def get_resubmit_keys(wf, unsuccessful_step_keys: bool = False):
     """[From DPGEN2] Get the keys of all steps in the workflow for resubmission.
+    
+    Args:
+        wf: The workflow object.
+        unsuccessful_step_keys: If True, include unsuccessful steps.
+        allowed_key_names: List of allowed KEYNAMEs to filter (e.g., ["ff-relax", "run-vasp", "prep-vasp"]).
     """
-    all_step_keys = successful_step_keys(wf, unsuccessful_step_keys)
+    allowed_key_names=[
+        "ff-relax",
+        "pre-screening",
+        "prep-vasp",
+        "run-vasp",
+        "distribute-structures",
+        "collect-relaxation",
+        "distribute-relax-structures",
+        "ion-md",
+        "select-ion-md",
+        "sun-eval-ff",
+        "select-vasp",
+        "sun-eval-vasp",
+        "mattergen-train",
+        "mattergen-generate",
+        "mattergen-prepare-data",
+        "collect-generate"
+    ]
+    all_step_keys = successful_step_keys(wf, unsuccessful_step_keys, allowed_key_names)
     all_step_keys = sort_slice_ops(
         all_step_keys,
         ["run-vasp","ion-md"],
@@ -117,12 +140,13 @@ def build_step_configs(config: dict) -> tuple:
     train_step_config = config.get("train", default_step_config)
     vasp_step_config = config.get("fp", default_step_config)
     ion_md_step_config = config.get("ion_md", default_step_config)
+    ff_relax_step_config = config.get("ff_relax", default_step_config)
     sun_eval_step_config = config.get("sun_eval", default_step_config)
     scheduler_step_config = config.get("scheduler", default_step_config)
     
     return (default_step_config, train_step_config, 
              vasp_step_config, ion_md_step_config,
-            sun_eval_step_config, scheduler_step_config)
+            sun_eval_step_config, scheduler_step_config,ff_relax_step_config)
 
 
 def build_vasp_config(config: dict) -> dict:
@@ -198,11 +222,10 @@ def build_workflow(config: dict) -> Workflow:
     module_names = config.get("upload_python_packages", [])
     
     upload_python_packages = setup_python_packages(module_names)
-    print(upload_python_packages)
     
     # Build step configs
     (default_step_config, train_step_config,  vasp_step_config, ion_md_step_config,sun_eval_step_config,
-     scheduler_step_config) = build_step_configs(config["step_config"])
+     scheduler_step_config, ff_relax_step_config) = build_step_configs(config["step_config"])
 
     # Get job configs
     workflow_config = config["jobs"].copy()
@@ -224,7 +247,8 @@ def build_workflow(config: dict) -> Workflow:
         name="screening",
         misc_step_config=default_step_config,
         sun_eval_step_config=sun_eval_step_config,
-        ff_step_config=ion_md_step_config,
+        ff_step_config=ff_relax_step_config,
+        md_step_config=ion_md_step_config,
         dft_step_config=vasp_step_config,
         upload_python_packages=upload_python_packages,
     )

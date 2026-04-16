@@ -130,6 +130,7 @@ class IonMD(OP):
             {
                 "traj": Artifact(Path),
                 "results": Artifact(Path),
+                "additional_results":Artifact(List[Path])
             },
         )
         
@@ -172,10 +173,9 @@ class IonMD(OP):
             calc = CalculatorWrapper.get_calculator(calc_style)
             calc = calc().create(model_path=str(model), **calc_cfg)
 
-            print(len(atoms))
             runner = MDRunner.from_atoms(atoms)
             runner.calc = calc
-        
+            additional_results = []
             # start md simulation
             try:
                 log_dir = config.get("log_dir")
@@ -185,6 +185,9 @@ class IonMD(OP):
                     log_dir=log_dir,
                     traj_dir=traj_dir,
                 )
+                plot_path = Path("msd_plot.png").resolve()
+                if plot_path.exists():
+                    additional_results.append(plot_path)
                 results_path = Path("md_results.json").resolve()
                 with open(results_path, "w") as f:
                     json.dump(res["analysis"], f, indent=4)
@@ -193,7 +196,9 @@ class IonMD(OP):
 
         return OPIO({
             "traj": res["last_traj"],
-            "results": results_path})
+            "results": results_path,
+            "additional_results": additional_results
+        })
     
 class SelectFrameIonMD(OP):
     def __init__(self):
@@ -213,7 +218,7 @@ class SelectFrameIonMD(OP):
     def get_output_sign(cls)-> OPIOSign:
         return OPIOSign(
             {
-                "selected_structures": Artifact(Path),
+                "selected_structures": Artifact(List[Path]),
                 "selected_results": Artifact(Path)
             },
         )
@@ -229,8 +234,8 @@ class SelectFrameIonMD(OP):
         selected_structures = []
         selected_results = {}
         li_threshold = config.get("li_above", 1e-6)  # Li diffusion threshold in cm^2/s
-        other_floor = config.get("other_floor", 1e-7)
-        other_divisor = config.get("other_divisor", 100)  # threshold_other = max(other_floor, li_diff/other_divisor)
+        other_floor = config.get("other_floor", 1e-8)
+        other_divisor = config.get("other_divisor", 1000)  # threshold_other = max(other_floor, li_diff/other_divisor)
         
         for idx, (structure, res_path) in enumerate(zip(structures, results)):
             try:
@@ -266,6 +271,9 @@ class SelectFrameIonMD(OP):
                     })
 
                     name = f"selected_{idx:06d}_{composition}.extxyz"
+                    atoms.info.update({
+                        "solid_electrolyte": "yes",
+                    })
                     write(name, atoms)
                     selected_results[f"{idx:06d}"] = res_tmp
                     selected_structures.append(Path(name))
