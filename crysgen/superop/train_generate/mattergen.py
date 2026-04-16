@@ -13,6 +13,9 @@ from dflow import (
     Outputs,
     Steps,
     OPTemplate,
+    argo_len,
+    argo_sequence,
+    argo_range
 )
 from dflow.python import (
     Artifact, 
@@ -21,7 +24,8 @@ from dflow.python import (
     OPIOSign, 
     OP,
     Parameter,
-    PythonOPTemplate
+    PythonOPTemplate,
+    Slices
 )
 from dflow import Step, Steps
 from crysgen.utils import set_directory,make_path
@@ -200,6 +204,47 @@ class PrepareData(OP):
         
         return OPIO(results)
 
+
+class CollectGenerated(OP):
+    """Merge generated structure files from sliced generate steps."""
+
+    @classmethod
+    def get_input_sign(cls) -> OPIOSign:
+        return OPIOSign(
+            {
+                "structures_list": Artifact(List[Path]),
+            }
+        )
+
+    @classmethod
+    def get_output_sign(cls) -> OPIOSign:
+        return OPIOSign(
+            {
+                "merged_structures": Artifact(Path),
+            }
+        )
+
+    @OP.exec_sign_check
+    def execute(self, ip: OPIO) -> OPIO:
+        from ase.io import read, write
+
+        structures_list = ip.get("structures_list", [])
+        atoms_all = []
+        for path in structures_list:
+            atoms = read(path, ":")
+            if isinstance(atoms, list):
+                atoms_all.extend(atoms)
+            else:
+                atoms_all.append(atoms)
+
+        merged_path = Path("merged_generated_structures.extxyz")
+        if atoms_all:
+            write(merged_path, atoms_all, format="extxyz")
+        else:
+            merged_path.write_text("")
+
+        return OPIO({"merged_structures": merged_path})
+
 class MatterGen(TrainGeneration):
     """
     MatterGen flow for crystal structure generation.
@@ -230,6 +275,7 @@ class MatterGen(TrainGeneration):
         
         step_config, step_template_config, step_executor = _pop_executor(
             step_config)
+        step_template_slice_config = step_config.pop("template_slice_config", {})
         prepare_data=Step(
             name='mattergen-prepare-data',
             template= PythonOPTemplate(
@@ -277,25 +323,53 @@ class MatterGen(TrainGeneration):
         generate=Step(
             name="generate",
             template = PythonOPTemplate(
-                Generate, 
+                Generate,
+                slices=Slices(
+                    '{{item}}',
+                    input_parameter=["task_name"],
+                    output_parameter=["results"],
+                    output_artifact=["generated_structures","extra_outputs"],
+                    group_size=1,
+                    pool_size=1
+                ),
                 python_packages=upload_python_packages,
                 **step_template_config
                 ),
             parameters={
-                "task_name":"mattergen-generate",
+                "task_name": train.outputs.parameters["generation_idx"],
                 "config":steps.inputs.parameters["generate_config"],
                 },
             artifacts={
                 "model":train.outputs.artifacts["model"],
             },
-            key="--".join(["%s"%steps.inputs.parameters["name"], "mattergen-generate"]),
+            with_sequence=argo_sequence(
+                argo_len(train.outputs.parameters["generation_idx"])#,format="%03d"
+                ),
+            key="--".join(["%s"%steps.inputs.parameters["name"], "mattergen-generate","{{item}}"]),
             executor=step_executor,
             **step_config
         )
         steps.add(generate)
-        steps.outputs.artifacts["generated_structures"]._from = generate.outputs.artifacts["generated_structures"]
+        
+        collect_generate = Step(
+            name="collect-generate",
+            template=PythonOPTemplate(
+                CollectGenerated,
+                python_packages=upload_python_packages,
+                **step_template_config,
+            ),
+            parameters={},
+            artifacts={
+                "structures_list": generate.outputs.artifacts["generated_structures"],
+            },
+            key="--".join(["%s"%steps.inputs.parameters["name"], "collect-generate"]),
+            executor=step_executor,
+            **step_config,
+        )
+        steps.add(collect_generate)
+        steps.outputs.artifacts["generated_structures"]._from = collect_generate.outputs.artifacts["merged_structures"]
         steps.outputs.artifacts["model"]._from = train.outputs.artifacts["model"]
-        steps.outputs.parameters["results"].value_from_parameter = generate.outputs.parameters["results"]
+        #steps.outputs.parameters["results"].value_from_parameter = generate.outputs.parameters["results"]
         return steps
         
         

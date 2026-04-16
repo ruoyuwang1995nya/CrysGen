@@ -41,6 +41,38 @@ def element_filter(
     return filtered, mask
 
 
+@Tools.register("multi_element_filter")
+def multi_element_filter(
+    atoms_ls: Sequence[Atoms],
+    **kwargs
+) -> Tuple[List[Atoms], List[bool]]:
+    """Filter out structures with only a single element type.
+
+    Excludes elemental structures (e.g., pure Si, pure Fe) and keeps only
+    compounds with multiple element types.
+
+    Args:
+        atoms_ls: Sequence of ASE Atoms objects to filter.
+
+    Returns:
+        Tuple of (filtered_atoms_list, boolean_mask).
+        An ``Atoms`` is kept only if it contains more than one element type.
+    """
+    filtered: List[Atoms] = []
+    mask: List[bool] = []
+
+    for atoms in atoms_ls:
+        unique_elements = set(atoms.get_chemical_symbols())
+        
+        if len(unique_elements) > 1:
+            mask.append(True)
+            filtered.append(atoms)
+        else:
+            mask.append(False)
+
+    return filtered, mask
+
+
 @Tools.register("oxidation_state_balance_filter")
 def oxidation_state_balance_filter(
     atoms_ls: Sequence[Atoms],

@@ -45,6 +45,7 @@ class Generate(OP):
         config=ip["config"]
         work_dir = Path(make_path(task_name))
         model_type = config.pop("model_type","foo")
+        config.pop("num_tasks",None)
         with set_directory(work_dir):
             generate=Tools.get(model_type+"_generate")
             generated_structures, additional_outputs, results = generate(model_path=model_file, **config)

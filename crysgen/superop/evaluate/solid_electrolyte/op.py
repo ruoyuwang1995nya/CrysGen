@@ -271,6 +271,9 @@ class SelectFrameIonMD(OP):
                     })
 
                     name = f"selected_{idx:06d}_{composition}.extxyz"
+                    atoms.info.update({
+                        "solid_electrolyte": "yes",
+                    })
                     write(name, atoms)
                     selected_results[f"{idx:06d}"] = res_tmp
                     selected_structures.append(Path(name))

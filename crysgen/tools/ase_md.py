@@ -499,7 +499,7 @@ class MDRunner:
             q_coul = charge_e * 1.602176634e-19
             n_indices = sum(1 for sym in symbols if sym == element)
             n_number_density = n_indices / volume_m3
-            sigma = n_number_density * (q_coul ** 2) * D_m2_s / (units.kB * temperature_K)
+            sigma = n_number_density * (q_coul ** 2) * D_m2_s / (1.380649e-23 * temperature_K)
             conductivity[element] = sigma.item()*1e-2 # S/cm
 
         total_sigma = sum(conductivity.values())
